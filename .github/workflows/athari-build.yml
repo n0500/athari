@@ -1,0 +1,38 @@
+name: Athari • Build Check
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: athari-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Validate static web app
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build static app
+        run: npm run build
+
+      - name: Verify Firebase Hosting output
+        run: test -f out/index.html
