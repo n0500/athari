@@ -5,7 +5,7 @@
   "compatibility_date": "2026-09-01",
   "ai": { "binding": "AI" },
   "vars": {
-    "FIREBASE_PROJECT_ID": "REPLACE_WITH_FIREBASE_PROJECT_ID",
-    "ALLOWED_ORIGINS": "https://REPLACE_WITH_FIREBASE_HOSTING_DOMAIN"
+    "FIREBASE_PROJECT_ID": "athari-f07a7",
+    "ALLOWED_ORIGINS": "https://athari-f07a7.web.app"
   }
 }
