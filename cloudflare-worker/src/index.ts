@@ -28,14 +28,15 @@ function cors(origin: string) {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Headers": "authorization,content-type",
     "Access-Control-Allow-Methods": "POST,OPTIONS",
-    Vary: "Origin",
+    "Vary": "Origin",
   };
 }
 
 function allowedOrigin(request: Request, env: Env) {
   const origin = request.headers.get("Origin") || "";
-  const allowed = env.ALLOWED_ORIGINS.split(",")
-    .map((v) => v.trim())
+  const allowed = env.ALLOWED_ORIGINS
+    .split(",")
+    .map((value) => value.trim())
     .filter(Boolean);
 
   return allowed.includes(origin) ? origin : allowed[0] || "";
@@ -79,10 +80,10 @@ function parseModelJson(value: unknown): unknown {
     throw new Error("AI_INVALID_OUTPUT");
   }
 
-  const obj = value as Record<string, unknown>;
+  const object = value as Record<string, unknown>;
 
-  if ("response" in obj) {
-    const response = obj.response;
+  if ("response" in object) {
+    const response = object.response;
     if (typeof response === "string") {
       return JSON.parse(stripCodeFence(response));
     }
@@ -91,7 +92,7 @@ function parseModelJson(value: unknown): unknown {
     }
   }
 
-  const choices = obj.choices;
+  const choices = object.choices;
   if (Array.isArray(choices) && choices.length) {
     const first = choices[0] as Record<string, unknown>;
     const message =
@@ -125,35 +126,41 @@ function sanitizeAnalysis(
   }
 
   const raw = value as Record<string, unknown>;
-  const allowedById = new Map(framework.map((e) => [e.id, e]));
-  const allowedByName = new Map(framework.map((e) => [e.officialName, e]));
+  const allowedById = new Map(framework.map((item) => [item.id, item]));
+  const allowedByName = new Map(
+    framework.map((item) => [item.officialName, item])
+  );
 
-  const facts = Array.isArray(raw.extractedFacts)
+  const extractedFacts = Array.isArray(raw.extractedFacts)
     ? raw.extractedFacts
         .slice(0, 30)
         .map((item) => {
-          const x =
+          const fact =
             item && typeof item === "object"
               ? (item as Record<string, unknown>)
               : {};
           return {
-            fact: asString(x.fact),
-            support: asString(x.support),
+            fact: asString(fact.fact),
+            support: asString(fact.support),
           };
         })
-        .filter((x) => x.fact)
+        .filter((item) => item.fact)
     : [];
 
-  const classifications = Array.isArray(raw.suggestedClassifications)
+  const suggestedClassifications = Array.isArray(
+    raw.suggestedClassifications
+  )
     ? raw.suggestedClassifications
         .slice(0, 2)
         .map((item) => {
-          const x =
+          const suggestion =
             item && typeof item === "object"
               ? (item as Record<string, unknown>)
               : {};
-          const requestedId = asString(x.elementId);
-          const requestedName = asString(x.elementName);
+
+          const requestedId = asString(suggestion.elementId);
+          const requestedName = asString(suggestion.elementName);
+
           const verified =
             allowedById.get(requestedId) ||
             allowedByName.get(requestedName);
@@ -163,7 +170,7 @@ function sanitizeAnalysis(
           return {
             elementId: verified.id,
             elementName: verified.officialName,
-            reason: asString(x.reason),
+            reason: asString(suggestion.reason),
           };
         })
         .filter(Boolean) as Analysis["suggestedClassifications"]
@@ -176,26 +183,22 @@ function sanitizeAnalysis(
       : null;
 
   const question = missing ? asString(missing.question) : "";
-  const missingInformation = question
-    ? {
-        question,
-        reason: asString(missing?.reason),
-      }
-    : null;
 
   return {
-    extractedFacts: facts,
+    extractedFacts,
     suggestedClassifications:
-      framework.length > 0 ? classifications : [],
+      framework.length > 0 ? suggestedClassifications : [],
     draftTitle: asString(raw.draftTitle),
     draftDescription: asString(raw.draftDescription),
     draftImpact: asString(raw.draftImpact),
-    missingInformation,
+    missingInformation: question
+      ? {
+          question,
+          reason: asString(missing?.reason),
+        }
+      : null,
     warnings: Array.isArray(raw.warnings)
-      ? raw.warnings
-          .slice(0, 10)
-          .map(asString)
-          .filter(Boolean)
+      ? raw.warnings.slice(0, 10).map(asString).filter(Boolean)
       : [],
   };
 }
@@ -249,17 +252,18 @@ export default {
           framework = parsed
             .slice(0, 30)
             .map((item) => {
-              const x =
+              const data =
                 item && typeof item === "object"
                   ? (item as Record<string, unknown>)
                   : {};
+
               return {
-                id: asString(x.id),
-                officialName: asString(x.officialName),
-                description: asString(x.description),
+                id: asString(data.id),
+                officialName: asString(data.officialName),
+                description: asString(data.description),
               };
             })
-            .filter((e) => e.id && e.officialName);
+            .filter((item) => item.id && item.officialName);
         }
       } catch {
         framework = [];
@@ -280,13 +284,15 @@ export default {
         }
       );
 
-      const result = Array.isArray(converted) ? converted[0] : converted;
+      const conversionResult = Array.isArray(converted)
+        ? converted[0]
+        : converted;
 
       const documentText =
-        result &&
-        "data" in result &&
-        typeof result.data === "string"
-          ? result.data
+        conversionResult &&
+        "data" in conversionResult &&
+        typeof conversionResult.data === "string"
+          ? conversionResult.data
           : "";
 
       if (!documentText.trim()) {

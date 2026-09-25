@@ -1,9 +1,9 @@
 # AI ZERO-COST HARDENING
 
-- Gemma 4 26B A4B remains the free-plan model target.
-- Thinking is disabled to reduce unnecessary AI usage.
+- The root Next.js TypeScript build no longer scans the separate Cloudflare Worker project.
 - The Worker accepts current Workers AI response shapes.
 - Model output is parsed and sanitized server-side.
 - Suggested classifications are filtered against the verified framework supplied by Firestore.
-- If no verified framework exists, the Worker returns no classification.
-- Evidence file is converted transiently; no Cloudflare evidence storage is introduced.
+- If no verified framework exists, no classification is returned.
+- Thinking is disabled to reduce unnecessary free-tier AI usage.
+- Evidence files are converted transiently; no Cloudflare evidence storage is introduced.
