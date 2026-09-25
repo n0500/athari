@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./athari-v2.css";
 
 export const metadata: Metadata = {
   title: "أثري | ملف الأداء الذكي",
@@ -15,9 +16,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ar" dir="rtl">
       <body>{children}</body>

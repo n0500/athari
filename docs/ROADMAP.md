@@ -1,54 +1,39 @@
-# ROADMAP
+# ROADMAP — ZERO COST V2
 
 ## Phase 0 — Architecture
 - [x] Product brief
-- [x] Codex instructions
 - [x] Security principles
-- [x] Cloud-first architecture
-- [x] UI V1 specification
-- [x] Select Next.js + Firebase App Hosting stack
+- [x] Zero-cost cloud architecture
+- [x] Google Drive ownership model
+- [x] AI Worker architecture
 - [ ] Add verified official performance framework source
 
-## Phase 1 — UI foundation
-- [ ] Next.js App Router project
-- [ ] Arabic RTL design system
-- [ ] Login screen
-- [ ] Mobile navigation
-- [ ] Dashboard
-- [ ] Add evidence flow
-- [ ] Evidence review screen
-- [ ] Evidence list
-- [ ] Portfolio view
-- [ ] Empty/loading/error states
+## Phase 1 — Functional foundation
+- [x] Static-export Next.js UI
+- [x] Firebase client foundation
+- [x] Google login + `drive.file`
+- [x] Drive folder/upload/move helpers
+- [x] Firestore evidence model
+- [x] Firestore ownership rules
+- [x] Evidence upload flow
+- [x] AI analysis client
+- [x] Review/approval flow
+- [x] Drive backup index
+- [x] Portfolio grouping by approved element
 
-## Phase 2 — Firebase
-- [ ] Firebase project / App Hosting backend
-- [ ] Authentication
-- [ ] Firestore collections
-- [ ] Storage
-- [ ] Security Rules
-- [ ] App Check where appropriate
+## Phase 2 — One-time cloud setup
+- [ ] Configure Firebase Spark project
+- [ ] Enable Google Authentication
+- [ ] Enable Firestore
+- [ ] Enable Google Drive API and OAuth scope
+- [ ] Deploy Cloudflare Worker
+- [ ] Add Firebase Hosting GitHub deployment workflow
+- [ ] Publish first live URL
 
-## Phase 3 — AI pipeline
-- [ ] Server-side provider adapter
-- [ ] Verified framework retrieval
-- [ ] Structured analysis response
-- [ ] Missing-information flow
-- [ ] Approval persistence
+## Phase 3 — Production hardening
+- [ ] Verified official framework import
+- [ ] Restore from `athari-backup.json`
+- [ ] Retry failed AI analysis
+- [ ] Duplicate-file detection
 - [ ] Audit events
-- [ ] Failure/retry behavior
-
-## Phase 4 — Smart portfolio
-- [ ] Coverage dashboard
-- [ ] Missing evidence guidance
-- [ ] Duplicate evidence detection
-- [ ] Strongest evidence suggestions
-- [ ] Reviewer/share view
-
-## Phase 5 — Production readiness
-- [ ] Access-control audit
-- [ ] File validation
-- [ ] Usage limits/cost controls
-- [ ] Backup/export
-- [ ] Privacy notice
-- [ ] Monitoring and logs
+- [ ] Accessibility and mobile QA

@@ -1,41 +1,31 @@
 # أثري | Athari
 
-منصة ذكية تساعد المعلمة على بناء ملف الأداء المهني من الشواهد الفعلية التي ترفعها بنفسها.
+منصة عربية Mobile-first لتنظيم شواهد الأداء المهني للمعلمة، مع تحليل AI قائم على الشاهد نفسه وقرار نهائي للمعلمة.
 
-## الفكرة الأساسية
+## Zero Cost V2
 
-المعلمة ترفع الشاهد الأصلي، ثم يقوم النظام بـ:
-1. قراءة محتوى الشاهد.
-2. اقتراح عنصر الأداء المناسب.
-3. اقتراح عنوان مهني ووصف مختصر.
-4. استخراج أثر مدعوم بالشاهد فقط.
-5. طرح سؤال مختصر إذا كانت معلومة أساسية ناقصة.
-6. عرض معاينة للمعلمة.
-7. الإضافة إلى ملفها فقط بعد الاعتماد.
+- GitHub: الكود والتحديثات.
+- Firebase Hosting (Spark): الواجهة.
+- Firebase Authentication (Spark): دخول Google.
+- Cloud Firestore (Spark): الفهرس والترتيب.
+- Google Drive الخاص بالمعلمة: الشواهد الأصلية ونسخة احتياطية.
+- Cloudflare Workers AI Free: التحليل.
+- Cloudflare Markdown Conversion: قراءة PDF/Word/الصور.
 
-## مبدأ غير قابل للتفاوض
+لا Firebase Storage، لا Cloud Functions، لا App Hosting، ولا Blaze.
 
-لا يختلق النظام إنجازًا أو أثرًا أو نتيجة غير موجودة في الشاهد أو لم تؤكدها المعلمة.
+## مسار الشاهد
 
-## القرار المعماري V1
+1. يحفظ الأصل في `أثري / السنة / 00 - قيد المراجعة` داخل Drive.
+2. يمرر أثري نسخة مؤقتة إلى AI للتحليل.
+3. تعرض الحقائق والاقتراحات للمعلمة.
+4. لا يعتمد شيء قبل موافقتها.
+5. بعد الاعتماد ينقل الملف إلى `أثري / السنة / عنصر الأداء`.
+6. يحدث `athari-backup.json` داخل Drive.
 
-- Frontend + secure server routes: Next.js + TypeScript.
-- Cloud build/deploy: Firebase App Hosting connected directly to GitHub `main`.
-- Authentication: Firebase Authentication.
-- Database: Cloud Firestore.
-- Evidence files: Cloud Storage for Firebase.
-- AI: server-side provider adapter only; secrets in managed cloud secrets.
-- GitHub Actions: يطبق `Athari-updates.zip` فقط، ولا يبني أو ينشر التطبيق.
+## صلاحية Drive
 
-راجع:
-- `docs/ARCHITECTURE_V1.md`
-- `docs/UI_V1.md`
-- `docs/SECURITY.md`
+يستخدم أثري scope:
+`https://www.googleapis.com/auth/drive.file`
 
-## نظام التحديثات
-
-كل تحديث يدوي من الجوال يأتي باسم ثابت:
-
-`Athari-updates.zip`
-
-ويرفع إلى جذر المستودع. GitHub Actions يتحقق منه ويفك الملفات ويحفظها في `main`. بعد ربط Firebase App Hosting بفرع `main`، تتولى Firebase البناء والنشر سحابيًا عند وصول commit جديد.
+ولا يطلب وصولًا عامًا لكل ملفات Drive.

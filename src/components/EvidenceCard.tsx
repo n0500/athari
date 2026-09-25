@@ -5,7 +5,10 @@ import { Icon } from "@/components/Icon";
 
 export function EvidenceCard({ item }: { item: Evidence }) {
   return (
-    <Link href={`/evidence/${item.id}`} className="evidence-card">
+    <Link
+      href={`/evidence/review?id=${encodeURIComponent(item.id)}`}
+      className="evidence-card"
+    >
       <div className="evidence-card-head">
         <StatusPill status={item.status} />
         <span className="muted-small">{item.date}</span>

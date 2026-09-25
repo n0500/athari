@@ -1,10 +1,19 @@
-# أول مهمة لـ Codex
+# CODEX FIRST TASK — CURRENT
 
-اقرأ `README.md` و`AGENTS.md` وكل ملفات `docs/` أولًا.
+Read:
+- README.md
+- AGENTS.md
+- docs/ARCHITECTURE_V2_ZERO_COST.md
+- docs/DRIVE_STORAGE.md
+- docs/AI_ZERO_COST.md
+- docs/DATA_MODEL.md
+- docs/SECURITY.md
 
-بعدها:
-1. لخص فهمك للمنتج في نقاط قصيرة.
-2. راجع نموذج البيانات واقترح فقط التعديلات الضرورية لـ MVP.
-3. اقترح بنية تقنية مناسبة لتطبيق عربي RTL وموجه للجوال، مع طبقة آمنة لاستدعاء مزود AI دون كشف المفاتيح للمتصفح.
-4. لا تبدأ البناء قبل أن توضح القرارات المعمارية والملفات التي ستنشئها.
-5. لا تخترع أسماء عناصر الأداء أو أوزانها؛ اعتبرها بيانات رسمية ستضاف من مصدر موثق.
+The current architecture is Zero Cost V2.
+
+Do not reintroduce Firebase App Hosting, Firebase Storage, Cloud Functions, Blaze, or a paid AI API.
+
+Before changing the evidence flow, preserve:
+Drive-owned original -> transient AI analysis -> teacher review -> approval -> Drive organization -> Firestore index -> Drive backup.
+
+Do not invent official performance elements or scores.

@@ -1,48 +1,21 @@
 # Athari repository instructions
 
-## Product
-Athari (أثري) is an Arabic-first, mobile-first professional performance evidence assistant for teachers.
+Athari is Arabic-first and mobile-first.
 
-Core flow:
-upload original evidence -> extract facts -> suggest performance element -> draft title/description/impact -> ask only for missing essential facts -> preview -> teacher approval -> add to portfolio.
+## Zero Cost V2
+- Next.js static export on Firebase Hosting.
+- Firebase Auth + Firestore on Spark.
+- Original evidence stays in each teacher's Google Drive.
+- Google Drive access is limited to `drive.file`.
+- Cloudflare Worker + Workers AI performs transient conversion and analysis.
+- Do not introduce Firebase Storage, Firebase Functions, App Hosting, Blaze, or paid AI APIs by default.
 
-## Architecture V1
-- Next.js App Router + TypeScript.
-- Firebase App Hosting for cloud build/deploy from GitHub `main`.
-- Firebase Authentication.
-- Cloud Firestore.
-- Cloud Storage for Firebase.
-- AI calls only from secure server-side routes through a provider adapter.
-- GitHub Actions only applies `Athari-updates.zip`; it is not the application build/deploy system.
-- No local laptop, local Node, or local Firebase CLI is required for normal operation/deployment.
+## Core flow
+upload -> save original to Drive inbox -> AI transient analysis -> teacher review -> approval -> move Drive file to performance-element folder -> update Firestore -> refresh Drive backup.
 
-## Non-negotiable behavior
-- Never invent an achievement, impact, result, date, participant count, or evidence.
-- Separate extracted facts from AI suggestions.
-- If evidence is insufficient, ask one concise question instead of guessing.
-- Preserve the original uploaded file.
-- Nothing enters the final portfolio without explicit teacher approval.
-- Do not hard-code official performance-element names, weights, or scoring unless they exist in a verified project source file.
-- Never present AI confidence as an official performance score.
-
-## UX
-- Arabic and RTL first.
-- Mobile-first.
-- Large readable typography and low visual clutter.
-- One obvious primary action per screen.
-- Original evidence must always be reachable from the review screen.
-- AI suggestions must be visually distinguishable from teacher-approved values.
-
-## Engineering
-- Keep modules small and typed.
-- Never commit secrets, API keys, service-account files, or private user data.
-- Validate file type, file size, ownership, and authorization.
-- Use least-privilege Firebase Security Rules.
-- Keep performance frameworks/versioned criteria as data, not hard-coded UI constants.
-- Prefer idempotent server operations for evidence analysis.
-
-## Working style
-- Read README.md, docs/ARCHITECTURE_V1.md, docs/PRODUCT.md, and docs/UI_V1.md before major changes.
-- For broad tasks, inspect the existing code before editing.
-- Make the smallest coherent change that completes the task.
-- Do not replace working features merely to change style.
+## Non-negotiable
+- Never invent achievement, impact, result, date, count, or participant data.
+- Do not hard-code official performance elements without a verified source.
+- AI output is separate from approved content.
+- Never store Google OAuth tokens in Firestore.
+- Never commit secrets.

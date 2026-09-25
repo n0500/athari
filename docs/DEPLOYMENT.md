@@ -1,40 +1,27 @@
-# Athari Cloud Workflow
+# DEPLOYMENT — ZERO COST
 
-## المبدأ
+## Web app
+The Next.js app uses `output: "export"` and produces the `out/` directory.
 
-أثري مشروع Cloud-first. لا يعتمد على جهاز محلي أو لابتوب للتشغيل أو النشر.
+Target:
+Firebase Hosting on the Spark plan.
 
-## مسار التحديث
+## Repository update flow
+`Athari-updates.zip` is uploaded to the repository root.
+The existing GitHub workflow validates and applies it.
 
-1. يتم تجهيز ملف واحد باسم `Athari-updates.zip`.
-2. يرفع الملف إلى جذر مستودع GitHub.
-3. GitHub Actions يعمل في السحابة ويفك التحديث ويثبت الملفات في المستودع.
-4. بعد تثبيت بنية التطبيق، ترتبط خدمة الاستضافة السحابية بفرع `main` وتتولى البناء والنشر من السحابة.
+## Hosting deployment
+A separate GitHub Actions deployment workflow will build the static app in GitHub's cloud runner and deploy `out/` to Firebase Hosting.
 
-## مسؤولية Workflow الحالي
+This build may use Node.js inside GitHub Actions. It does not require Node.js or Firebase CLI on the user's device.
 
-الـWorkflow الحالي لا:
-- يشغل Node.js.
-- يشغل npm.
-- يبني التطبيق.
-- يستخدم Firebase CLI.
-- يحتفظ بمفاتيح نشر.
+## AI
+The Cloudflare Worker is deployed separately once, then updated from its source folder.
 
-وظيفته فقط:
-`Upload ZIP -> Validate -> Apply -> Commit`
-
-## النشر
-
-نحدد خدمة النشر بعد تثبيت معمارية التطبيق. يجب أن تكون:
-- مرتبطة بفرع `main`.
-- تبني وتنشر من السحابة.
-- لا تحتاج جهازًا محليًا.
-- تحفظ الأسرار في Secret Manager أو إعدادات الخدمة، لا داخل GitHub أو الواجهة.
-
-## Backend الذكاء الاصطناعي
-
-يجب أن يكون Backend سحابيًا وآمنًا. لا يرسل مفتاح AI إلى المتصفح. اختيار التقنية النهائية يؤجل حتى اعتماد معمارية الـMVP.
-
-## قاعدة ثابتة
-
-لا تُضاف مفاتيح API أو Service Account أو بيانات طالبات إلى `Athari-updates.zip` أو المستودع.
+## Required one-time account configuration
+- Firebase Web App public config
+- Firebase Google Authentication
+- Firestore and rules
+- Google Drive API + OAuth consent with `drive.file`
+- Cloudflare Worker AI binding
+- Firebase project ID and allowed web origin in the Worker

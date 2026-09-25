@@ -1,9 +1,14 @@
-# Cloud-first engineering note
+# CLOUD RULES
 
-Athari must remain cloud-first:
-- Do not require a local laptop, local Node.js, local Firebase CLI, or a long-running local server for normal development/deployment.
+Athari is cloud-first and zero-cost-first.
+
+- No local laptop is required for normal operation.
 - GitHub is the source of truth.
-- The update workflow only applies repository updates.
-- Build/deploy must run in a managed cloud service connected to `main`.
-- Backend/AI secrets are server-side only.
-- Do not expose provider keys in browser code or committed files.
+- GitHub Actions applies update packages and later deploys the static build.
+- Firebase Hosting serves only the static web app.
+- Firebase Auth and Firestore stay on Spark.
+- Evidence binaries live in each teacher's Google Drive, never Firebase Storage.
+- Google Drive scope stays limited to `drive.file`.
+- AI runs in a Cloudflare Worker with Workers AI Free.
+- When a free quota is exhausted, fail safely; never auto-upgrade or auto-bill.
+- Secrets never appear in browser code or GitHub.

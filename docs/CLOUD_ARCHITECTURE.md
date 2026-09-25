@@ -1,23 +1,19 @@
-# CLOUD ARCHITECTURE
+# CLOUD ARCHITECTURE — CURRENT
 
-## القرار المعتمد V1
+## المعمارية الحالية
+- GitHub: المصدر والتحديثات.
+- Next.js Static Export: الواجهة.
+- Firebase Hosting على Spark: الاستضافة.
+- Firebase Authentication على Spark: الدخول.
+- Cloud Firestore على Spark: الفهرس والترتيب.
+- Google Drive الخاص بالمعلمة: ملفات الشواهد الأصلية والنسخة الاحتياطية.
+- Cloudflare Worker + Workers AI Free: قراءة الشاهد وتحليله.
 
-- GitHub هو مصدر الكود.
-- GitHub Actions يطبق `Athari-updates.zip` فقط.
-- Firebase App Hosting يرتبط بفرع `main` ويتولى Cloud Build + rollout.
-- Next.js + TypeScript هو تطبيق الويب.
-- Firebase Authentication للدخول.
-- Cloud Firestore للبيانات.
-- Cloud Storage للشواهد.
-- Server-side AI adapter داخل التطبيق.
-- الأسرار في بيئة Firebase/Google Cloud المدارة، لا في GitHub ولا المتصفح.
+## ممنوع افتراضيًا
+- Firebase App Hosting
+- Firebase Storage
+- Cloud Functions
+- Blaze
+- API مدفوع للذكاء الاصطناعي
 
-## لا يوجد اعتماد محلي
-
-المستخدمة لا تحتاج:
-- لابتوب.
-- Terminal محلي.
-- Node محلي.
-- Firebase CLI محلي.
-
-قد تستخدم منصة الاستضافة Runtime مبنيًا على Node داخل السحابة، لكن ذلك جزء من البنية المدارة ولا يحتاج تشغيلًا على جهاز المستخدمة.
+أي تغيير يضيف تكلفة يحتاج قرارًا صريحًا قبل التنفيذ.

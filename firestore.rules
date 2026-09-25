@@ -1,0 +1,58 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read, create, update: if owns(uid);
+      allow delete: if false;
+    }
+
+    match /portfolios/{portfolioId} {
+      allow create: if signedIn() &&
+        request.resource.data.ownerUid == request.auth.uid;
+      allow read, update, delete: if signedIn() &&
+        resource.data.ownerUid == request.auth.uid;
+    }
+
+    match /evidence/{evidenceId} {
+      allow create: if signedIn() &&
+        request.resource.data.ownerUid == request.auth.uid;
+
+      allow read: if signedIn() &&
+        resource.data.ownerUid == request.auth.uid;
+
+      allow update: if signedIn() &&
+        resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
+
+      allow delete: if signedIn() &&
+        resource.data.ownerUid == request.auth.uid;
+    }
+
+    match /frameworks/{frameworkId} {
+      allow read: if signedIn();
+      allow write: if false;
+
+      match /elements/{elementId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+    match /auditEvents/{eventId} {
+      allow create: if signedIn() &&
+        request.resource.data.ownerUid == request.auth.uid;
+      allow read: if signedIn() &&
+        resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}

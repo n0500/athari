@@ -1,61 +1,24 @@
-# DATA MODEL — Draft
+# DATA MODEL — V2
 
-> هذا نموذج أولي. لا يعتمد نهائيًا قبل بدء التنفيذ.
+## users/{uid}
+displayName, email, role, updatedAt
 
-## User
-- id
-- displayName
-- email
-- role: teacher | reviewer | admin
-- createdAt
+## evidence/{evidenceId}
+ownerUid, academicYear, status
+originalFileName, mimeType, fileSize
+driveFileId, driveWebViewLink, driveParentFolderId
+aiAnalysis
+approvedContent
+createdAt, updatedAt, approvedAt
 
-## Portfolio
-- id
-- ownerUserId
-- academicYear
-- status: active | archived
-- createdAt
-- updatedAt
+## frameworks/{frameworkId}
+name, version, sourceReference, status
 
-## Evidence
-- id
-- portfolioId
-- ownerUserId
-- originalFileRef
-- originalFileName
-- mimeType
-- uploadStatus
-- reviewStatus: pending | needs_info | ready | approved | rejected
-- extractedFacts
-- suggestedPerformanceElementId
-- approvedPerformanceElementId
-- draftTitle
-- approvedTitle
-- draftDescription
-- approvedDescription
-- draftImpact
-- approvedImpact
-- missingInformation
-- teacherNotes
-- createdAt
-- updatedAt
-- approvedAt
+## frameworks/{frameworkId}/elements/{elementId}
+officialName, description, order, weight, sourceReference
 
-## PerformanceElement
-لا تُدخل أسماء أو أوزان رسمية هنا إلا من مرجع موثق داخل المشروع.
-- id
-- officialName
-- description
-- weight
-- sourceReference
+## auditEvents/{eventId}
+ownerUid, evidenceId, action, createdAt, metadata
 
-## AuditEvent
-- id
-- userId
-- evidenceId
-- action
-- timestamp
-- metadata
-
-## قاعدة مهمة
-احتفظ دائمًا بالقيم المقترحة منفصلة عن القيم التي اعتمدتها المعلمة.
+## Drive backup
+`athari-backup.json` contains a recoverable index of evidence IDs, Drive file IDs, statuses and approved content.
