@@ -1,39 +1,23 @@
 # CLOUD ARCHITECTURE
 
-## الهدف
+## القرار المعتمد V1
 
-كل دورة العمل لأثري سحابية بالكامل، ويمكن إدارتها من الجوال أو الآيباد.
+- GitHub هو مصدر الكود.
+- GitHub Actions يطبق `Athari-updates.zip` فقط.
+- Firebase App Hosting يرتبط بفرع `main` ويتولى Cloud Build + rollout.
+- Next.js + TypeScript هو تطبيق الويب.
+- Firebase Authentication للدخول.
+- Cloud Firestore للبيانات.
+- Cloud Storage للشواهد.
+- Server-side AI adapter داخل التطبيق.
+- الأسرار في بيئة Firebase/Google Cloud المدارة، لا في GitHub ولا المتصفح.
 
-## الطبقات
+## لا يوجد اعتماد محلي
 
-### GitHub
-- مصدر الكود.
-- استقبال ملف التحديث الموحد.
-- حفظ تاريخ التغييرات.
-
-### GitHub Actions
-- تطبيق ملف `Athari-updates.zip` داخل المستودع.
-- لا يستخدم كخادم للتطبيق.
-- لا يحتاج جهاز المستخدم.
-
-### Hosting / Build Cloud
-- ترتبط لاحقًا بفرع `main`.
-- تتولى Build وDeploy في السحابة تلقائيًا.
-- التقنية النهائية تحدد بعد اختيار Stack الواجهة.
-
-### Data
-الخيار المبدئي: Firebase Authentication + Firestore + Cloud Storage، بعد مراجعة متطلبات المنتج.
-
-### AI Backend
-خدمة سحابية آمنة خلف API.
-- الأسرار Server-side فقط.
-- التحقق من هوية المستخدم قبل تحليل الشواهد.
-- لا تخزين أو إرسال زائد عن الحاجة.
-
-## لا يوجد Local Dependency
-
-لا توجد خطوة تشغيل أو نشر تتطلب:
+المستخدمة لا تحتاج:
 - لابتوب.
 - Terminal محلي.
 - Node محلي.
 - Firebase CLI محلي.
+
+قد تستخدم منصة الاستضافة Runtime مبنيًا على Node داخل السحابة، لكن ذلك جزء من البنية المدارة ولا يحتاج تشغيلًا على جهاز المستخدمة.

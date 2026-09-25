@@ -17,38 +17,25 @@
 
 لا يختلق النظام إنجازًا أو أثرًا أو نتيجة غير موجودة في الشاهد أو لم تؤكدها المعلمة.
 
-## حالة المشروع
+## القرار المعماري V1
 
-هذا المستودع هو نقطة البداية الرسمية للمشروع، ومهيأ للعمل مع Codex.
+- Frontend + secure server routes: Next.js + TypeScript.
+- Cloud build/deploy: Firebase App Hosting connected directly to GitHub `main`.
+- Authentication: Firebase Authentication.
+- Database: Cloud Firestore.
+- Evidence files: Cloud Storage for Firebase.
+- AI: server-side provider adapter only; secrets in managed cloud secrets.
+- GitHub Actions: يطبق `Athari-updates.zip` فقط، ولا يبني أو ينشر التطبيق.
 
-## البنية
-
-- `AGENTS.md` تعليمات Codex الخاصة بالمشروع.
-- `docs/PRODUCT.md` تعريف المنتج ومسار الاستخدام.
-- `docs/AI_BEHAVIOR.md` قواعد الذكاء الاصطناعي.
-- `docs/DATA_MODEL.md` نموذج البيانات المبدئي.
-- `docs/ROADMAP.md` مراحل التنفيذ.
-- `docs/SECURITY.md` مبادئ الخصوصية والأمان.
-- `src/` مكان كود التطبيق عند بدء التنفيذ.
-
-## المرحلة الأولى
-
-MVP:
-رفع شاهد → تحليل → تصنيف → صياغة → سؤال عند النقص → معاينة → اعتماد → إضافته للملف.
-
-## ملاحظات تقنية
-
-- الواجهة عربية وRTL أولًا.
-- الهاتف هو الجهاز الأساسي.
-- لا تحفظ أي مفاتيح API داخل الواجهة أو المستودع.
-- مزود الذكاء الاصطناعي وطبقة الخادم يثبتان بقرار معماري مستقل.
+راجع:
+- `docs/ARCHITECTURE_V1.md`
+- `docs/UI_V1.md`
+- `docs/SECURITY.md`
 
 ## نظام التحديثات
 
-التحديثات اليدوية من الجوال تعتمد ملفًا واحدًا ثابت الاسم:
+كل تحديث يدوي من الجوال يأتي باسم ثابت:
 
-`updates/Athari-updates.zip`
+`Athari-updates.zip`
 
-عند رفعه إلى `main`، يبدأ Workflow واحد يتولى التحقق، تطبيق التحديث، الفحوصات، البناء، النشر إلى Firebase، ثم حفظ الملفات المحدثة داخل المستودع.
-
-راجع `updates/README.md` و`docs/DEPLOYMENT.md` للتفاصيل.
+ويرفع إلى جذر المستودع. GitHub Actions يتحقق منه ويفك الملفات ويحفظها في `main`. بعد ربط Firebase App Hosting بفرع `main`، تتولى Firebase البناء والنشر سحابيًا عند وصول commit جديد.
