@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "updates/Athari-updates.zip"
+      - "Athari-updates.zip"
 
   workflow_dispatch:
 
@@ -30,7 +30,7 @@ jobs:
 
       - name: Check update package
         run: |
-          test -f "updates/Athari-updates.zip" || {
+          test -f "Athari-updates.zip" || {
             echo "Athari-updates.zip was not found."
             exit 1
           }
@@ -41,7 +41,7 @@ jobs:
           from zipfile import ZipFile
           from pathlib import PurePosixPath
 
-          archive = "updates/Athari-updates.zip"
+          archive = "Athari-updates.zip"
 
           with ZipFile(archive) as z:
               files = [
@@ -76,14 +76,13 @@ jobs:
         run: |
           rm -rf .athari-update
           mkdir -p .athari-update
-          unzip -q updates/Athari-updates.zip -d .athari-update
+          unzip -q Athari-updates.zip -d .athari-update
 
       - name: Apply update
         run: |
           rsync -a \
             --exclude=".git/" \
             --exclude=".github/" \
-            --exclude="updates/" \
             --exclude="node_modules/" \
             --exclude=".env" \
             .athari-update/ ./
@@ -126,7 +125,7 @@ jobs:
 
       - name: Save applied update to repository
         run: |
-          git add -A ':(exclude)updates/Athari-updates.zip'
+          git add -A ':(exclude)Athari-updates.zip'
 
           if git diff --cached --quiet; then
             echo "No project files changed."
