@@ -1,27 +1,37 @@
 name: Athari • Build Check
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows:
+      - "Athari • Apply Update"
+    types:
+      - completed
+
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: athari-build-${{ github.ref }}
+  group: athari-build
   cancel-in-progress: true
 
 jobs:
   build:
     name: Validate static web app
+
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Checkout repository
+      - name: Checkout latest applied version
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set up Node
         uses: actions/setup-node@v4
