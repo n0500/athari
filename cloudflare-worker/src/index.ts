@@ -9,6 +9,20 @@ type Env = {
 const MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
+type Analysis = {
+  extractedFacts: Array<{ fact: string; support: string }>;
+  suggestedClassifications: Array<{
+    elementId: string;
+    elementName: string;
+    reason: string;
+  }>;
+  draftTitle: string;
+  draftDescription: string;
+  draftImpact: string;
+  missingInformation: null | { question: string; reason: string };
+  warnings: string[];
+};
+
 function cors(origin: string) {
   return {
     "Access-Control-Allow-Origin": origin,
@@ -20,9 +34,11 @@ function cors(origin: string) {
 
 function allowedOrigin(request: Request, env: Env) {
   const origin = request.headers.get("Origin") || "";
-  const allowed = env.ALLOWED_ORIGINS.split(",")
-    .map((v) => v.trim())
+  const allowed = env.ALLOWED_ORIGINS
+    .split(",")
+    .map((value) => value.trim())
     .filter(Boolean);
+
   return allowed.includes(origin) ? origin : allowed[0] || "";
 }
 
@@ -47,12 +63,144 @@ async function verifyFirebaseToken(request: Request, env: Env) {
   return payload.sub;
 }
 
-function parseResult(value: unknown) {
-  if (typeof value === "object" && value && "response" in value) {
-    return JSON.parse(String((value as { response: unknown }).response));
+function stripCodeFence(text: string) {
+  return text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
+function parseModelJson(value: unknown): unknown {
+  if (typeof value === "string") {
+    return JSON.parse(stripCodeFence(value));
   }
-  if (typeof value === "string") return JSON.parse(value);
-  return value;
+
+  if (!value || typeof value !== "object") {
+    throw new Error("AI_INVALID_OUTPUT");
+  }
+
+  const object = value as Record<string, unknown>;
+
+  if ("response" in object) {
+    const response = object.response;
+    if (typeof response === "string") {
+      return JSON.parse(stripCodeFence(response));
+    }
+    if (response && typeof response === "object") {
+      return response;
+    }
+  }
+
+  const choices = object.choices;
+  if (Array.isArray(choices) && choices.length) {
+    const first = choices[0] as Record<string, unknown>;
+    const message =
+      first && typeof first.message === "object" && first.message
+        ? (first.message as Record<string, unknown>)
+        : undefined;
+
+    const content = message?.content;
+    if (typeof content === "string") {
+      return JSON.parse(stripCodeFence(content));
+    }
+  }
+
+  throw new Error("AI_INVALID_OUTPUT");
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function sanitizeAnalysis(
+  value: unknown,
+  framework: Array<{
+    id: string;
+    officialName: string;
+    description?: string;
+  }>
+): Analysis {
+  if (!value || typeof value !== "object") {
+    throw new Error("AI_INVALID_OUTPUT");
+  }
+
+  const raw = value as Record<string, unknown>;
+  const allowedById = new Map(framework.map((item) => [item.id, item]));
+  const allowedByName = new Map(
+    framework.map((item) => [item.officialName, item])
+  );
+
+  const extractedFacts = Array.isArray(raw.extractedFacts)
+    ? raw.extractedFacts
+        .slice(0, 30)
+        .map((item) => {
+          const fact =
+            item && typeof item === "object"
+              ? (item as Record<string, unknown>)
+              : {};
+          return {
+            fact: asString(fact.fact),
+            support: asString(fact.support),
+          };
+        })
+        .filter((item) => item.fact)
+    : [];
+
+  const suggestedClassifications = Array.isArray(
+    raw.suggestedClassifications
+  )
+    ? raw.suggestedClassifications
+        .slice(0, 2)
+        .map((item) => {
+          const suggestion =
+            item && typeof item === "object"
+              ? (item as Record<string, unknown>)
+              : {};
+
+          const requestedId = asString(suggestion.elementId);
+          const requestedName = asString(suggestion.elementName);
+
+          const verified =
+            allowedById.get(requestedId) ||
+            allowedByName.get(requestedName);
+
+          if (!verified) return null;
+
+          return {
+            elementId: verified.id,
+            elementName: verified.officialName,
+            reason: asString(suggestion.reason),
+          };
+        })
+        .filter(Boolean) as Analysis["suggestedClassifications"]
+    : [];
+
+  const missing =
+    raw.missingInformation &&
+    typeof raw.missingInformation === "object"
+      ? (raw.missingInformation as Record<string, unknown>)
+      : null;
+
+  const question = missing ? asString(missing.question) : "";
+
+  return {
+    extractedFacts,
+    suggestedClassifications:
+      framework.length > 0 ? suggestedClassifications : [],
+    draftTitle: asString(raw.draftTitle),
+    draftDescription: asString(raw.draftDescription),
+    draftImpact: asString(raw.draftImpact),
+    missingInformation: question
+      ? {
+          question,
+          reason: asString(missing?.reason),
+        }
+      : null,
+    warnings: Array.isArray(raw.warnings)
+      ? raw.warnings.slice(0, 10).map(asString).filter(Boolean)
+      : [],
+  };
 }
 
 export default {
@@ -92,10 +240,31 @@ export default {
         );
       }
 
-      let framework: unknown[] = [];
+      let framework: Array<{
+        id: string;
+        officialName: string;
+        description?: string;
+      }> = [];
+
       try {
         const parsed = JSON.parse(frameworkText);
-        if (Array.isArray(parsed)) framework = parsed.slice(0, 30);
+        if (Array.isArray(parsed)) {
+          framework = parsed
+            .slice(0, 30)
+            .map((item) => {
+              const data =
+                item && typeof item === "object"
+                  ? (item as Record<string, unknown>)
+                  : {};
+
+              return {
+                id: asString(data.id),
+                officialName: asString(data.officialName),
+                description: asString(data.description),
+              };
+            })
+            .filter((item) => item.id && item.officialName);
+        }
       } catch {
         framework = [];
       }
@@ -138,17 +307,20 @@ export default {
       const prompt = `
 You are Athari, an evidence-grounded assistant for teachers.
 
-Rules:
-- Never invent results, impact, dates, counts, people, organizations or achievements.
-- Extract only facts supported by the evidence.
-- If no verified framework is supplied, suggestedClassifications must be [].
-- Use at most two classifications from the supplied framework.
-- draftImpact must contain only supported impact; otherwise say no documented impact is available yet.
-- Ask at most one essential missing-information question.
-- Do not score the teacher.
-- Return valid JSON only.
+NON-NEGOTIABLE RULES:
+- Never invent results, impact, dates, counts, people, organizations, percentages, or achievements.
+- Extract only facts directly supported by the supplied evidence.
+- "support" must briefly identify where the fact came from in the evidence.
+- Use only performance elements in VERIFIED_FRAMEWORK.
+- If VERIFIED_FRAMEWORK is empty, suggestedClassifications must be [].
+- Use at most two classification suggestions.
+- draftImpact must contain only impact directly supported by evidence.
+- If no impact is documented, write a neutral Arabic sentence stating that documented impact is not available yet.
+- Ask at most ONE essential missing-information question.
+- Never score or rate the teacher.
+- Return JSON only, with no Markdown fence and no commentary.
 
-Return this exact shape:
+Required JSON shape:
 {
   "extractedFacts":[{"fact":"","support":""}],
   "suggestedClassifications":[{"elementId":"","elementName":"","reason":""}],
@@ -159,27 +331,33 @@ Return this exact shape:
   "warnings":[]
 }
 
-VERIFIED FRAMEWORK:
+VERIFIED_FRAMEWORK:
 ${JSON.stringify(framework)}
 
 EVIDENCE:
 ${evidence}
 `;
 
-      const result = await env.AI.run(MODEL, {
+      const aiResult = await env.AI.run(MODEL, {
         messages: [
           {
             role: "system",
-            content: "Return evidence-grounded JSON only. Never fabricate.",
+            content:
+              "Return one valid JSON object only. Evidence-grounded. Never fabricate.",
           },
           { role: "user", content: prompt },
         ],
         temperature: 0.1,
         max_completion_tokens: 1200,
-        response_format: { type: "json_object" },
+        chat_template_kwargs: {
+          enable_thinking: false,
+        },
       });
 
-      return Response.json(parseResult(result), {
+      const parsed = parseModelJson(aiResult);
+      const safe = sanitizeAnalysis(parsed, framework);
+
+      return Response.json(safe, {
         headers: {
           ...cors(origin),
           "Cache-Control": "no-store",
@@ -188,7 +366,14 @@ ${evidence}
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "UNKNOWN_ERROR";
-      const status = message === "UNAUTHORIZED" ? 401 : 500;
+
+      const status =
+        message === "UNAUTHORIZED"
+          ? 401
+          : /quota|limit|too many|429/i.test(message)
+          ? 429
+          : 500;
+
       return Response.json(
         { error: message },
         { status, headers: cors(origin) }
