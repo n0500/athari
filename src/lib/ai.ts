@@ -1,14 +1,14 @@
 import { requireAuth } from "@/lib/firebase";
 import { AiAnalysis, FrameworkElement } from "@/types/athari";
 
-const endpoint = process.env.NEXT_PUBLIC_ATHARI_AI_URL;
+const endpoint =
+  process.env.NEXT_PUBLIC_ATHARI_AI_URL ??
+  "https://athari-ai.t720711.workers.dev";
 
 export async function analyzeEvidence(
   file: File,
   framework: FrameworkElement[]
 ): Promise<AiAnalysis> {
-  if (!endpoint) throw new Error("AI_NOT_CONFIGURED");
-
   const user = requireAuth().currentUser;
   if (!user) throw new Error("AUTH_REQUIRED");
 

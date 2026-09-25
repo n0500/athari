@@ -2,11 +2,26 @@ import { FirebaseApp, getApps, initializeApp } from "firebase/app";
 import { Auth, getAuth } from "firebase/auth";
 import { Firestore, getFirestore } from "firebase/firestore";
 
+const publicFirebaseConfig = {
+  apiKey: "AIzaSyCbdcojVVJN44dWekq1WZFRQzYnN-hXJl0",
+  authDomain: "athari-f07a7.firebaseapp.com",
+  projectId: "athari-f07a7",
+  appId: "1:107135331394:web:e1475a5aa9bac09516d1db",
+};
+
 const config = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey:
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY ??
+    publicFirebaseConfig.apiKey,
+  authDomain:
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ??
+    publicFirebaseConfig.authDomain,
+  projectId:
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ??
+    publicFirebaseConfig.projectId,
+  appId:
+    process.env.NEXT_PUBLIC_FIREBASE_APP_ID ??
+    publicFirebaseConfig.appId,
 };
 
 export const firebaseConfigured = Boolean(
