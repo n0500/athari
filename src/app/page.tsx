@@ -12,9 +12,13 @@ import { EvidenceRecord } from "@/types/athari";
 export default function HomePage() {
   const [items, setItems] = useState<EvidenceRecord[]>([]);
   const [loading, setLoading] = useState(firebaseConfigured);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!firebaseConfigured) return;
+    if (!firebaseConfigured) {
+      setLoading(false);
+      return;
+    }
 
     return onAuthStateChanged(requireAuth(), async (user) => {
       if (!user) {
@@ -24,7 +28,10 @@ export default function HomePage() {
       }
 
       try {
+        setError("");
         setItems(await listUserEvidence(user.uid));
+      } catch {
+        setError("تعذر تحميل بيانات ملفك الآن. حاولي تحديث الصفحة.");
       } finally {
         setLoading(false);
       }
@@ -74,12 +81,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {!firebaseConfigured ? (
-        <div className="setup-notice">
-          هذه معاينة للواجهة. بعد إدخال إعدادات Firebase ستظهر بياناتك
-          الفعلية هنا.
-        </div>
-      ) : null}
+      {error ? <div className="flow-message is-error">{error}</div> : null}
 
       <section className="page-section">
         <div className="section-heading">
@@ -118,7 +120,7 @@ export default function HomePage() {
             </Link>
           ))}
 
-          {!loading && firebaseConfigured && attention.length === 0 ? (
+          {!loading && !error && attention.length === 0 ? (
             <div className="setup-notice">
               لا توجد شواهد معلقة حاليًا.
             </div>
@@ -131,7 +133,7 @@ export default function HomePage() {
         <div>
           <strong>Drive يحفظ، وأثري يرتب</strong>
           <p>
-            حتى لو تعطل أثري، تبقى ملفاتك الأصلية ونسخة الفهرس في حسابك.
+            ملفاتك الأصلية في حسابك، وأثري يعرض حالة كل شاهد واعتماده.
           </p>
         </div>
       </section>

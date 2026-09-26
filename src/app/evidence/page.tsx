@@ -27,12 +27,26 @@ function classificationNames(item: EvidenceRecord) {
   );
 }
 
+function statusLabel(item: EvidenceRecord) {
+  if (item.status === "approved") return "معتمد";
+  if (item.status === "needs_info") return "يحتاج معلومة";
+  if (item.status === "ready_for_review") return "جاهز للمراجعة";
+  if (item.status === "analysis_failed") return "تعذر التحليل";
+  if (item.status === "analyzing") return "قيد التحليل";
+  if (item.status === "uploaded") return "تم الحفظ";
+  return "قيد المتابعة";
+}
+
 export default function EvidencePage() {
   const [items, setItems] = useState<EvidenceRecord[]>([]);
   const [loading, setLoading] = useState(firebaseConfigured);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!firebaseConfigured) return;
+    if (!firebaseConfigured) {
+      setLoading(false);
+      return;
+    }
 
     return onAuthStateChanged(requireAuth(), async (user) => {
       if (!user) {
@@ -40,8 +54,12 @@ export default function EvidencePage() {
         setLoading(false);
         return;
       }
+
       try {
+        setError("");
         setItems(await listUserEvidence(user.uid));
+      } catch {
+        setError("تعذر تحميل الشواهد الآن. حاولي تحديث الصفحة.");
       } finally {
         setLoading(false);
       }
@@ -50,10 +68,10 @@ export default function EvidencePage() {
 
   return (
     <AppShell title="الشواهد" subtitle="الفهرس السريع في أثري">
-      {!firebaseConfigured ? (
-        <div className="setup-notice">
-          يلزم ربط Firebase لإظهار الشواهد الحقيقية.
-        </div>
+      {error ? <div className="flow-message is-error">{error}</div> : null}
+
+      {loading ? (
+        <div className="setup-notice">جاري تحميل الشواهد…</div>
       ) : null}
 
       <div className="stack">
@@ -67,27 +85,33 @@ export default function EvidencePage() {
               key={item.id}
             >
               <div className="evidence-card-head">
-                <span className="status-pill status-ready">
-                  {item.status === "approved"
-                    ? "معتمد"
-                    : item.status === "needs_info"
-                    ? "يحتاج معلومة"
-                    : item.status === "analysis_failed"
-                    ? "تعذر التحليل"
-                    : "قيد المتابعة"}
+                <span
+                  className={`status-pill ${
+                    item.status === "approved"
+                      ? "status-approved"
+                      : item.status === "needs_info" ||
+                        item.status === "analysis_failed"
+                      ? "status-needs-info"
+                      : "status-ready"
+                  }`}
+                >
+                  {statusLabel(item)}
                 </span>
                 <span className="muted-small">{item.academicYear}</span>
               </div>
+
               <h3>
                 {item.approvedContent?.title ||
                   item.aiAnalysis?.draftTitle ||
                   item.originalFileName}
               </h3>
+
               <p>
                 {names.length
                   ? names.join(" · ")
                   : "لم يعتمد التصنيف بعد"}
               </p>
+
               <div className="file-row">
                 <Icon name="file" size={17} />
                 <span>{item.originalFileName}</span>
@@ -96,14 +120,18 @@ export default function EvidencePage() {
           );
         })}
 
-        {!loading && firebaseConfigured && items.length === 0 ? (
+        {!loading && !error && items.length === 0 ? (
           <div className="setup-notice">
-            ابدئي بأول شاهد، وسيظهر هنا بعد حفظه في Drive.
+            لا توجد شواهد بعد. ابدئي بإضافة أول شاهد.
           </div>
         ) : null}
       </div>
 
-      <Link className="floating-add" href="/evidence/new" aria-label="إضافة شاهد">
+      <Link
+        className="floating-add"
+        href="/evidence/new"
+        aria-label="إضافة شاهد"
+      >
         <Icon name="plus" size={25} />
       </Link>
     </AppShell>

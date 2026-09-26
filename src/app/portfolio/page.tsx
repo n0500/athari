@@ -40,9 +40,13 @@ function classificationsFor(item: EvidenceRecord): ApprovedClassification[] {
 export default function PortfolioPage() {
   const [items, setItems] = useState<EvidenceRecord[]>([]);
   const [loading, setLoading] = useState(firebaseConfigured);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!firebaseConfigured) return;
+    if (!firebaseConfigured) {
+      setLoading(false);
+      return;
+    }
 
     return onAuthStateChanged(requireAuth(), async (user) => {
       if (!user) {
@@ -50,9 +54,13 @@ export default function PortfolioPage() {
         setLoading(false);
         return;
       }
+
       try {
+        setError("");
         const all = await listUserEvidence(user.uid);
         setItems(all.filter((item) => item.status === "approved"));
+      } catch {
+        setError("تعذر تحميل ملف الأداء الآن. حاولي تحديث الصفحة.");
       } finally {
         setLoading(false);
       }
@@ -107,11 +115,7 @@ export default function PortfolioPage() {
         </p>
       </section>
 
-      {!firebaseConfigured ? (
-        <div className="setup-notice">
-          الواجهة جاهزة. بعد ربط Firebase ستظهر الشواهد الحقيقية مرتبة هنا.
-        </div>
-      ) : null}
+      {error ? <div className="flow-message is-error">{error}</div> : null}
 
       <div className="stack">
         {grouped.map(([element, evidence], index) => (
@@ -144,12 +148,15 @@ export default function PortfolioPage() {
                         </span>
                       ) : null}
                     </div>
+
                     <span>{item.originalFileName}</span>
+
                     {classification.reason ? (
                       <p className="classification-reason">
                         {classification.reason}
                       </p>
                     ) : null}
+
                     {item.driveWebViewLink ? (
                       <a
                         href={item.driveWebViewLink}
@@ -166,7 +173,7 @@ export default function PortfolioPage() {
           </section>
         ))}
 
-        {!loading && firebaseConfigured && grouped.length === 0 ? (
+        {!loading && !error && grouped.length === 0 ? (
           <div className="setup-notice">
             لا توجد شواهد معتمدة بعد.
           </div>

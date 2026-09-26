@@ -123,17 +123,36 @@ export async function approveEvidence(
   });
 }
 
+function createdAtMillis(record: EvidenceRecord) {
+  const value = record.createdAt as
+    | { toMillis?: () => number; seconds?: number }
+    | undefined;
+
+  if (typeof value?.toMillis === "function") {
+    return value.toMillis();
+  }
+
+  if (typeof value?.seconds === "number") {
+    return value.seconds * 1000;
+  }
+
+  return 0;
+}
+
 export async function listUserEvidence(uid: string) {
+  // Deliberately avoids a composite index so all core pages work immediately
+  // on the Spark project. Sort newest-first locally after fetching.
   const q = query(
     collection(requireDb(), "evidence"),
     where("ownerUid", "==", uid),
-    orderBy("createdAt", "desc"),
     limit(250)
   );
+
   const snaps = await getDocs(q);
-  return snaps.docs.map(
-    (d) => ({ id: d.id, ...d.data() }) as EvidenceRecord
-  );
+
+  return snaps.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as EvidenceRecord)
+    .sort((a, b) => createdAtMillis(b) - createdAtMillis(a));
 }
 
 export async function getActiveFrameworkElements(): Promise<FrameworkElement[]> {
@@ -169,8 +188,6 @@ export async function getActiveFrameworkElements(): Promise<FrameworkElement[]> 
 
     return elements.length ? elements : OFFICIAL_TEACHER_FRAMEWORK_V2;
   } catch {
-    // A verified local copy is the safe zero-cost fallback until an
-    // administratively managed Firestore framework is available.
     return OFFICIAL_TEACHER_FRAMEWORK_V2;
   }
 }
