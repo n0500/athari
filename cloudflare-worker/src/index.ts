@@ -315,10 +315,19 @@ NON-NEGOTIABLE RULES:
 - If VERIFIED_FRAMEWORK is empty, suggestedClassifications must be [].
 - Use at most two classification suggestions.
 - draftImpact must contain only impact directly supported by evidence.
-- If no impact is documented, write a neutral Arabic sentence stating that documented impact is not available yet.
+- If no impact is documented, write exactly: "لا يوجد أثر موثق متاح حاليًا."
 - Ask at most ONE essential missing-information question.
 - Never score or rate the teacher.
 - Return JSON only, with no Markdown fence and no commentary.
+
+ARABIC OUTPUT RULES:
+- All user-facing generated text must be in clear Modern Standard Arabic, even when the evidence is in English.
+- This applies to extractedFacts.fact, extractedFacts.support, suggestedClassifications.reason, draftTitle, draftDescription, draftImpact, missingInformation.question, missingInformation.reason, and warnings.
+- Keep official performance element names exactly as they appear in VERIFIED_FRAMEWORK.
+- Proper nouns, organization names, product names, and original document titles may remain in their original language only when that preserves accuracy.
+- Do not copy long English sentences from the evidence into user-facing fields; summarize them faithfully in Arabic.
+- Preserve the distinction between facts explicitly documented in the evidence and draft wording suggested by Athari.
+- Do not add an Arabic fact unless its meaning is directly supported by the evidence.
 
 Required JSON shape:
 {
@@ -343,7 +352,7 @@ ${evidence}
           {
             role: "system",
             content:
-              "Return one valid JSON object only. Evidence-grounded. Never fabricate.",
+              "Return one valid JSON object only. Evidence-grounded. Never fabricate. Write all user-facing generated text in clear Modern Standard Arabic, while preserving official framework names and necessary proper nouns exactly.",
           },
           { role: "user", content: prompt },
         ],
