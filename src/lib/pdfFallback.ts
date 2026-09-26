@@ -1,7 +1,6 @@
 const MAX_FALLBACK_PAGES = 3;
 const TARGET_PAGE_WIDTH = 1200;
 const PAGE_GAP = 24;
-const PDFJS_VERSION = "6.3.289";
 
 function isPdf(file: File) {
   return (
@@ -24,13 +23,13 @@ function canvasToJpeg(canvas: HTMLCanvasElement, quality = 0.9) {
 }
 
 /**
- * Converts the first few PDF pages to one local JPEG contact sheet.
- * Uses the PDF.js legacy browser build and a public worker script for
- * better compatibility with iOS Safari + Next static export.
+ * Renders image-only/scanned PDFs locally in the browser.
  *
- * Only the generic PDF.js worker code is loaded from the CDN.
- * The teacher's PDF bytes stay in the browser until Athari creates the
- * temporary JPEG that is sent to the existing AI endpoint.
+ * Important:
+ * - The PDF bytes stay on the user's device during rendering.
+ * - PDF.js worker is bundled by Next/Webpack and served from the same origin.
+ *   This avoids iOS Safari failures caused by cross-origin module workers.
+ * - Only the temporary JPEG contact sheet is sent to Athari's AI endpoint.
  */
 export async function renderPdfForAiFallback(
   file: File
@@ -41,14 +40,17 @@ export async function renderPdfForAiFallback(
     const pdfjs = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as any;
 
     if (pdfjs?.GlobalWorkerOptions) {
-      pdfjs.GlobalWorkerOptions.workerSrc =
-        `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/legacy/build/pdf.worker.min.mjs`;
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+        "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+        import.meta.url
+      ).toString();
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
     const loadingTask = pdfjs.getDocument({
       data: bytes,
       isEvalSupported: false,
+      useWorkerFetch: false,
     });
     const pdf = await loadingTask.promise;
 
