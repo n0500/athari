@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./athari-v2.css";
+import "./athari-v4.css";
 import "./share-v5.css";
 
 export const metadata: Metadata = {
@@ -12,7 +13,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f5f7f4",
+  themeColor: "#f8fbff",
 };
 
 export default function RootLayout({
