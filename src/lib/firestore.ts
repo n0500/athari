@@ -13,6 +13,7 @@ import {
   where,
 } from "firebase/firestore";
 import { requireDb } from "@/lib/firebase";
+import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import {
   AiAnalysis,
   ApprovedContent,
@@ -136,29 +137,40 @@ export async function listUserEvidence(uid: string) {
 }
 
 export async function getActiveFrameworkElements(): Promise<FrameworkElement[]> {
-  const frameworks = query(
-    collection(requireDb(), "frameworks"),
-    where("status", "==", "active"),
-    limit(1)
-  );
-  const frameworkSnap = await getDocs(frameworks);
-  const framework = frameworkSnap.docs[0];
-  if (!framework) return [];
+  try {
+    const frameworks = query(
+      collection(requireDb(), "frameworks"),
+      where("status", "==", "active"),
+      limit(1)
+    );
+    const frameworkSnap = await getDocs(frameworks);
+    const framework = frameworkSnap.docs[0];
 
-  const elementsSnap = await getDocs(
-    query(
-      collection(
-        requireDb(),
-        "frameworks",
-        framework.id,
-        "elements"
-      ),
-      orderBy("order", "asc")
-    )
-  );
+    if (!framework) {
+      return OFFICIAL_TEACHER_FRAMEWORK_V2;
+    }
 
-  return elementsSnap.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<FrameworkElement, "id">),
-  }));
+    const elementsSnap = await getDocs(
+      query(
+        collection(
+          requireDb(),
+          "frameworks",
+          framework.id,
+          "elements"
+        ),
+        orderBy("order", "asc")
+      )
+    );
+
+    const elements = elementsSnap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<FrameworkElement, "id">),
+    }));
+
+    return elements.length ? elements : OFFICIAL_TEACHER_FRAMEWORK_V2;
+  } catch {
+    // A verified local copy is the safe zero-cost fallback until an
+    // administratively managed Firestore framework is available.
+    return OFFICIAL_TEACHER_FRAMEWORK_V2;
+  }
 }

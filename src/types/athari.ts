@@ -66,4 +66,6 @@ export type FrameworkElement = {
   description?: string;
   order?: number;
   sourceReference?: string;
+  weightPercent?: number;
+  category?: "common" | "role_responsibility" | "additional_assignment";
 };
