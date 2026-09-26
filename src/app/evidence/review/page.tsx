@@ -77,9 +77,21 @@ function ReviewInner() {
           setPrimaryId(suggestions[0].elementId);
         }
 
-        setTitle(record?.aiAnalysis?.draftTitle ?? "");
-        setDescription(record?.aiAnalysis?.draftDescription ?? "");
-        setImpact(record?.aiAnalysis?.draftImpact ?? "");
+        setTitle(
+          record?.approvedContent?.title ??
+            record?.aiAnalysis?.draftTitle ??
+            ""
+        );
+        setDescription(
+          record?.approvedContent?.description ??
+            record?.aiAnalysis?.draftDescription ??
+            ""
+        );
+        setImpact(
+          record?.approvedContent?.impact ??
+            record?.aiAnalysis?.draftImpact ??
+            ""
+        );
       })
       .catch(() => setError("تعذر تحميل الشاهد."))
       .finally(() => setLoading(false));
@@ -149,6 +161,8 @@ function ReviewInner() {
       ),
     ].slice(0, MAX_CLASSIFICATIONS);
 
+    let stage: "drive" | "firestore" | "backup" = "drive";
+
     try {
       setSaving(true);
       setError("");
@@ -161,8 +175,6 @@ function ReviewInner() {
 
       const token = await ensureDriveAccessToken();
 
-      // One original only: it lives in the primary Drive folder.
-      // Additional classifications are Athari index links, not duplicate files.
       const { element } = await ensureAthariElementFolder(
         token,
         item.academicYear,
@@ -178,8 +190,9 @@ function ReviewInner() {
         );
       }
 
+      stage = "firestore";
+
       const approved: ApprovedContent = {
-        // Keep primary legacy fields for old screens/records.
         elementId: primary.elementId,
         elementName: primary.elementName,
         classifications: ordered.map((suggestion) => ({
@@ -195,29 +208,51 @@ function ReviewInner() {
 
       await approveEvidence(id, approved, element.id);
 
-      const all = await listUserEvidence(user.uid);
-      await upsertAthariBackup(token, {
-        format: "athari-backup-v2",
-        exportedAt: new Date().toISOString(),
-        evidence: all.map((e) => ({
-          id: e.id,
-          academicYear: e.academicYear,
-          status: e.status,
-          originalFileName: e.originalFileName,
-          driveFileId: e.driveFileId,
-          driveWebViewLink: e.driveWebViewLink,
-          approvedContent: e.approvedContent,
-        })),
-      });
+      stage = "backup";
+
+      // Backup is important, but it must not roll back or block a completed
+      // approval. If it fails, the approved Firestore record + Drive original
+      // remain valid, and the next successful approval can refresh the backup.
+      try {
+        const all = await listUserEvidence(user.uid);
+        await upsertAthariBackup(token, {
+          format: "athari-backup-v2",
+          exportedAt: new Date().toISOString(),
+          evidence: all.map((e) => ({
+            id: e.id,
+            academicYear: e.academicYear,
+            status: e.status,
+            originalFileName: e.originalFileName,
+            driveFileId: e.driveFileId,
+            driveWebViewLink: e.driveWebViewLink,
+            approvedContent: e.approvedContent,
+          })),
+        });
+      } catch {
+        // Do not block the teacher after approval is already committed.
+      }
 
       router.push("/portfolio");
     } catch (e) {
       const raw = e instanceof Error ? e.message : "UNKNOWN";
-      setError(
-        raw === "DRIVE_RECONNECT_REQUIRED"
-          ? "انتهت جلسة Drive. اضغطي «اعتماد وترتيب في Drive» مرة أخرى لإعادة الربط تلقائيًا."
-          : "تعذر الاعتماد الآن. الأصل لم يُحذف من Drive."
-      );
+
+      if (raw === "DRIVE_RECONNECT_REQUIRED") {
+        setError(
+          "انتهت جلسة Drive. اضغطي «اعتماد وترتيب في Drive» مرة أخرى لإعادة الربط تلقائيًا."
+        );
+      } else if (stage === "drive") {
+        setError(
+          "تعذر ترتيب الأصل في Drive الآن. لم يُحذف الشاهد؛ أعيدي المحاولة."
+        );
+      } else if (stage === "firestore") {
+        setError(
+          "تم ترتيب الأصل في Drive، لكن تعذر حفظ الاعتماد في أثري. أعيدي المحاولة؛ لن يتكرر الملف."
+        );
+      } else {
+        setError(
+          "تم الاعتماد، لكن تعذر تحديث النسخة الاحتياطية الآن."
+        );
+      }
     } finally {
       setSaving(false);
     }

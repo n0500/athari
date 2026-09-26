@@ -149,18 +149,42 @@ export async function uploadEvidenceToDrive(
   );
 }
 
+async function getDriveFile(
+  token: string,
+  fileId: string
+): Promise<DriveFile> {
+  return driveJson<DriveFile>(
+    token,
+    `${DRIVE_API}/files/${encodeURIComponent(
+      fileId
+    )}?fields=id,name,parents,webViewLink`
+  );
+}
+
 export async function moveDriveFile(
   token: string,
   fileId: string,
-  fromParentId: string | undefined,
+  _fromParentId: string | undefined,
   toParentId: string
 ) {
+  // Read the real current parents first. This makes approval retry-safe:
+  // if a previous attempt already moved the file, we do not try to remove
+  // a stale parent again.
+  const current = await getDriveFile(token, fileId);
+  const currentParents = current.parents ?? [];
+
+  if (currentParents.includes(toParentId)) {
+    return current;
+  }
+
   const params = new URLSearchParams({
     addParents: toParentId,
     fields: "id,name,parents,webViewLink",
   });
 
-  if (fromParentId) params.set("removeParents", fromParentId);
+  if (currentParents.length) {
+    params.set("removeParents", currentParents.join(","));
+  }
 
   return driveJson<DriveFile>(
     token,
