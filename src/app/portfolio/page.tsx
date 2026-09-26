@@ -22,16 +22,12 @@ import type {
   ShareEvidence,
 } from "@/lib/portfolioShare";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
+import { ELEMENT_GUIDANCE } from "@/data/element-guidance";
 import {
   ApprovedClassification,
   EvidenceAttachment,
   EvidenceRecord,
 } from "@/types/athari";
-
-type GroupedEvidence = {
-  item: EvidenceRecord;
-  classification: ApprovedClassification;
-};
 
 function classificationsFor(item: EvidenceRecord): ApprovedClassification[] {
   const approved = item.approvedContent;
@@ -137,56 +133,40 @@ export default function PortfolioPage() {
     });
   }, []);
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, GroupedEvidence[]>();
-
+  const evidenceByElement = useMemo(() => {
+    const map = new Map<string, EvidenceRecord[]>();
     for (const item of items) {
-      const classifications = classificationsFor(item);
-      for (const classification of classifications) {
-        const key = classification.elementName;
-        map.set(key, [
-          ...(map.get(key) || []),
-          { item, classification },
-        ]);
+      for (const classification of classificationsFor(item)) {
+        const current = map.get(classification.elementId) ?? [];
+        if (!current.some((entry) => entry.id === item.id)) {
+          map.set(classification.elementId, [...current, item]);
+        }
       }
     }
-
-    return OFFICIAL_TEACHER_FRAMEWORK_V2
-      .map(
-        (element) =>
-          [element.officialName, map.get(element.officialName) || []] as const
-      )
-      .filter(([, evidence]) => evidence.length > 0);
+    return map;
   }, [items]);
 
-  const covered = useMemo(() => {
-    const ids = new Set<string>();
-    for (const item of items) {
-      classificationsFor(item).forEach((classification) =>
-        ids.add(classification.elementId)
-      );
-    }
-    return ids;
-  }, [items]);
+  const covered = useMemo(
+    () => new Set([...evidenceByElement.entries()].filter(([, list]) => list.length).map(([id]) => id)),
+    [evidenceByElement]
+  );
 
-  const year =
-    process.env.NEXT_PUBLIC_ATHARI_ACADEMIC_YEAR || "1448هـ";
+  const year = process.env.NEXT_PUBLIC_ATHARI_ACADEMIC_YEAR || "1448هـ";
   const totalElements = OFFICIAL_TEACHER_FRAMEWORK_V2.length;
   const coverage = totalElements
     ? Math.round((covered.size / totalElements) * 100)
     : 0;
 
   const driveFileIds = useMemo(
-    () =>
-      [
-        ...new Set(
-          items.flatMap((item) =>
-            attachmentsFor(item)
-              .map((attachment) => attachment.driveFileId)
-              .filter((value): value is string => Boolean(value))
-          )
-        ),
-      ],
+    () => [
+      ...new Set(
+        items.flatMap((item) =>
+          attachmentsFor(item)
+            .map((attachment) => attachment.driveFileId)
+            .filter((value): value is string => Boolean(value))
+        )
+      ),
+    ],
     [items]
   );
 
@@ -212,11 +192,8 @@ export default function PortfolioPage() {
       setShareMessage("");
 
       const token = await ensureDriveAccessToken();
-      const currentShare = await getActivePortfolioShare(user.uid).catch(
-        () => null
-      );
-      const previousPermissions =
-        currentShare?.drivePermissions ?? sharePermissions;
+      const currentShare = await getActivePortfolioShare(user.uid).catch(() => null);
+      const previousPermissions = currentShare?.drivePermissions ?? sharePermissions;
 
       const published = await publishPortfolioFiles(
         token,
@@ -270,11 +247,8 @@ export default function PortfolioPage() {
       setShareBusy(true);
       setShareMessage("");
       const token = await ensureDriveAccessToken();
-      const currentShare = await getActivePortfolioShare(user.uid).catch(
-        () => null
-      );
-      const permissions =
-        currentShare?.drivePermissions ?? sharePermissions;
+      const currentShare = await getActivePortfolioShare(user.uid).catch(() => null);
+      const permissions = currentShare?.drivePermissions ?? sharePermissions;
 
       await revokePortfolioPermissions(token, permissions);
       await revokePortfolioShare(user.uid, shareId);
@@ -297,204 +271,147 @@ export default function PortfolioPage() {
 
   return (
     <AppShell title="ملفي" subtitle="ملف الأداء المهني">
-      <section className="portfolio-hero">
-        <div>
-          <span className="eyebrow light">العام الدراسي {year}</span>
-          <h1>ملف أداء جاهز للمراجعة والمشاركة</h1>
+      <section className="v4-portfolio-hero">
+        <div className="v4-hero-illustration" aria-hidden>
+          <span className="v4-folder f1" />
+          <span className="v4-folder f2" />
+          <span className="v4-folder f3" />
+          <span className="v4-pencil p1" />
+          <span className="v4-leaf l1" />
+          <span className="v4-leaf l2" />
+          <span className="v4-star s1">✦</span>
+        </div>
+
+        <div className="v4-portfolio-hero-copy">
+          <span className="v4-year-chip">العام الدراسي {year}</span>
+          <h2>ملف أداء جاهز للمراجعة والمشاركة</h2>
           <p>
             {loading
-              ? "جاري تحميل الملف…"
-              : `${items.length} شاهد معتمد يغطي ${covered.size} من ${totalElements} عناصر الأداء.`}
+              ? "جاري تحميل ملفك…"
+              : `${items.length} شاهد معتمد تغطي ${covered.size} من ${totalElements} عنصر تقييم`}
           </p>
         </div>
-        <div className="portfolio-score">
-          <strong>{loading ? "…" : `${coverage}%`}</strong>
-          <span>تغطية الإطار</span>
+
+        <div className="v4-progress-wrap">
+          <div
+            className="v4-progress-ring"
+            style={{
+              background: `conic-gradient(#6ce6d1 ${coverage * 3.6}deg, rgba(255,255,255,.18) 0deg)`,
+            }}
+          >
+            <div className="v4-progress-core">
+              <strong>{loading ? "…" : `${coverage}%`}</strong>
+              <span>تغطية الإطار</span>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="portfolio-actions">
-        <Link className="action-tile" href="/preview">
-          <span className="action-icon"><Icon name="eye" size={22} /></span>
+      <section className="v4-action-stack">
+        <Link className="v4-action-card v4-action-blue" href="/preview">
+          <span className="v4-action-icon"><Icon name="eye" size={24} /></span>
           <div>
             <strong>معاينة الملف</strong>
             <small>شاهدي نسخة العرض قبل إرسالها</small>
           </div>
-          <Icon name="chevron" size={18} />
+          <Icon name="chevron" size={20} />
         </Link>
 
         <button
           type="button"
-          className="action-tile share-action"
+          className="v4-action-card v4-action-mint"
           onClick={createShare}
           disabled={shareBusy || !items.length}
         >
-          <span className="action-icon"><Icon name="share" size={22} /></span>
+          <span className="v4-action-icon"><Icon name="share" size={24} /></span>
           <div>
             <strong>{shareBusy ? "جاري التجهيز…" : "مشاركة الملف"}</strong>
-            <small>رابط عرض داخل أثري · للقراءة فقط</small>
+            <small>رابط عرض داخل أثري - للقراءة فقط</small>
           </div>
-          <Icon name="chevron" size={18} />
+          <Icon name="chevron" size={20} />
         </button>
       </section>
 
       {shareUrl ? (
-        <section className="share-ready-card">
-          <div className="share-ready-head">
-            <span className="share-ready-icon"><Icon name="link" size={20} /></span>
+        <section className="v4-share-card">
+          <div className="v4-share-head">
+            <span className="v4-share-icon"><Icon name="link" size={23} /></span>
             <div>
               <strong>رابط العرض جاهز</strong>
-              <p>المديرة ترى نسخة مرتبة داخل أثري، ولا ترى مجلدات Drive. إذا أضفتِ شواهد جديدة اضغطي «مشاركة الملف» لتحديث نفس الرابط.</p>
+              <p>
+                المديرة ترى نسخة مرتبة داخل أثري، ولا ترى مجلدات Drive. إذا
+                أضفتِ شواهد جديدة اضغطي «مشاركة الملف» لتحديث نفس الرابط.
+              </p>
             </div>
           </div>
-          <a
-            className="share-url"
-            href={shareUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {shareUrl}
+
+          <a className="v4-share-url" href={shareUrl} target="_blank" rel="noreferrer">
+            <span>{shareUrl}</span>
+            <Icon name="copy" size={18} />
           </a>
-          <div className="share-buttons">
-            <button
-              className="secondary-button"
-              onClick={() => copyShareLink(shareUrl)}
-            >
+
+          <div className="v4-share-buttons">
+            <button className="v4-blue-button" onClick={() => copyShareLink(shareUrl)}>
               <Icon name="copy" size={17} /> نسخ الرابط
             </button>
-            <a
-              className="secondary-button"
-              href={shareUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
+            <a className="v4-outline-button" href={shareUrl} target="_blank" rel="noreferrer">
               <Icon name="external" size={17} /> فتح نسخة العرض
             </a>
-            <button
-              className="text-danger-button"
-              onClick={revokeShare}
-              disabled={shareBusy}
-            >
+            <button className="v4-danger-button" onClick={revokeShare} disabled={shareBusy}>
               إيقاف المشاركة
             </button>
           </div>
         </section>
       ) : null}
 
-      {shareMessage ? (
-        <div className="flow-message">{shareMessage}</div>
-      ) : null}
-
+      {shareMessage ? <div className="flow-message">{shareMessage}</div> : null}
       {error ? <div className="flow-message is-error">{error}</div> : null}
 
-      <section className="page-section">
-        <div className="section-heading">
+      <section className="v4-elements-section">
+        <div className="v4-section-heading">
           <div>
-            <span className="eyebrow">عناصر الأداء</span>
+            <span>عناصر التقييم</span>
             <h2>الشواهد المعتمدة</h2>
+            <p>المسميات والتفسيرات وفق الدليل الإرشادي المعتمد.</p>
           </div>
-          <span className="section-count">{grouped.length} عناصر مغطاة</span>
+          <span className="v4-covered-pill">{covered.size} عناصر مغطاة</span>
         </div>
 
-        <div className="stack portfolio-stack">
-          {grouped.map(([element, evidence], index) => (
-            <section className="portfolio-group" key={element}>
-              <div className="element-card premium-element">
-                <div className="element-number">{index + 1}</div>
-                <div className="element-copy">
-                  <strong>{element}</strong>
-                  <span>
-                    {evidence.length} {evidence.length === 1 ? "شاهد" : "شواهد"}
-                  </span>
-                </div>
-                <span className="element-check"><Icon name="check" size={17} /></span>
-              </div>
-
-              <div className="portfolio-evidence-list">
-                {evidence.map(({ item, classification }) => {
-                  const shared = classificationsFor(item).length > 1;
-                  const attachments = attachmentsFor(item);
-
-                  return (
-                    <article
-                      className="portfolio-evidence"
-                      key={`${item.id}-${classification.elementId}`}
-                    >
-                      <div className="portfolio-evidence-head">
-                        <strong>{item.approvedContent?.title}</strong>
-                        {shared ? (
-                          <span className="shared-badge">
-                            {classification.isPrimary
-                              ? "مشترك · أساسي"
-                              : "شاهد مشترك"}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <p className="portfolio-description">
-                        {item.approvedContent?.description}
-                      </p>
-
-                      <div className="portfolio-meta-row">
-                        <span>
-                          <Icon name="file" size={15} />{" "}
-                          {attachments.length === 1
-                            ? "ملف أصلي"
-                            : `${attachments.length} ملفات أصلية`}
-                        </span>
-                        {item.approvedContent?.impact &&
-                        item.approvedContent.impact !==
-                          "لا يوجد أثر موثق متاح حاليًا." ? (
-                          <span>
-                            <Icon name="sparkle" size={15} /> أثر موثق
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="attachment-links">
-                        {attachments.map((attachment, attachmentIndex) =>
-                          attachment.driveWebViewLink ? (
-                            <a
-                              key={`${attachment.originalFileName}-${attachmentIndex}`}
-                              href={attachment.driveWebViewLink}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              <Icon name="external" size={14} />
-                              {attachments.length === 1
-                                ? "فتح الأصل"
-                                : `فتح الملف ${attachmentIndex + 1}`}
-                            </a>
-                          ) : null
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-
-          {!loading && !error && grouped.length === 0 ? (
-            <div className="empty-state polished-empty">
-              <span><Icon name="folder" size={26} /></span>
-              <strong>ملفك ينتظر أول شاهد معتمد</strong>
-              <p>
-                بعد اعتماد الشاهد سيظهر هنا تلقائيًا تحت عنصر الأداء المناسب.
-              </p>
-              <Link className="primary-button" href="/evidence/new">
-                إضافة شاهد
+        <div className="v4-element-grid">
+          {OFFICIAL_TEACHER_FRAMEWORK_V2.map((element) => {
+            const evidence = evidenceByElement.get(element.id) ?? [];
+            const guidance = ELEMENT_GUIDANCE[element.id];
+            return (
+              <Link
+                href={`/element?id=${encodeURIComponent(element.id)}`}
+                className={`v4-element-card tone-${guidance?.tone ?? "blue"} ${
+                  evidence.length ? "is-covered" : ""
+                }`}
+                key={element.id}
+              >
+                <span className="v4-element-icon">
+                  <Icon name={guidance?.icon ?? "file"} size={29} />
+                </span>
+                {evidence.length ? (
+                  <span className="v4-element-check"><Icon name="check" size={15} /></span>
+                ) : null}
+                <strong>{element.officialName}</strong>
+                <small>
+                  {evidence.length
+                    ? `${evidence.length} ${evidence.length === 1 ? "شاهد معتمد" : "شواهد معتمدة"}`
+                    : "لا يوجد شاهد معتمد بعد"}
+                </small>
               </Link>
-            </div>
-          ) : null}
+            );
+          })}
         </div>
       </section>
 
-      <section className="privacy-note">
-        <Icon name="shield" size={19} />
+      <section className="v4-privacy-note">
+        <Icon name="shield" size={18} />
         <p>
-          رابط العرض يشارك <strong>الشواهد المعتمدة فقط</strong>. المديرة لا
-          تحتاج لتسجيل الدخول، ولا يظهر لها تنظيم Google Drive الداخلي.
+          رابط العرض يشارك <strong>الشواهد المعتمدة فقط</strong> ولا يتيح
+          للمديرة تعديل بياناتك أو رؤية تنظيم Google Drive الداخلي.
         </p>
       </section>
     </AppShell>
