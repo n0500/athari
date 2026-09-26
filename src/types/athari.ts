@@ -21,6 +21,7 @@ export type AiAnalysis = {
   draftImpact: string;
   missingInformation: MissingInformation;
   warnings: string[];
+  unreadableFiles?: string[];
 };
 
 export type ApprovedClassification = {
@@ -39,6 +40,16 @@ export type ApprovedContent = {
   impact: string;
 };
 
+export type EvidenceAttachment = {
+  originalFileName: string;
+  mimeType: string;
+  fileSize: number;
+  contentHash?: string;
+  driveFileId?: string;
+  driveWebViewLink?: string;
+  driveParentFolderId?: string;
+};
+
 export type EvidenceRecord = {
   id: string;
   ownerUid: string;
@@ -47,7 +58,9 @@ export type EvidenceRecord = {
   originalFileName: string;
   mimeType: string;
   fileSize: number;
+  fileCount?: number;
   contentHash?: string;
+  attachments?: EvidenceAttachment[];
   driveFileId?: string;
   driveWebViewLink?: string;
   driveParentFolderId?: string;

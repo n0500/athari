@@ -7,7 +7,9 @@ type Env = {
 };
 
 const MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const MAX_FILES = 8;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 30 * 1024 * 1024;
 
 type Analysis = {
   extractedFacts: Array<{ fact: string; support: string }>;
@@ -21,6 +23,7 @@ type Analysis = {
   draftImpact: string;
   missingInformation: null | { question: string; reason: string };
   warnings: string[];
+  unreadableFiles?: string[];
 };
 
 function cors(origin: string) {
@@ -28,17 +31,15 @@ function cors(origin: string) {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Headers": "authorization,content-type",
     "Access-Control-Allow-Methods": "POST,OPTIONS",
-    "Vary": "Origin",
+    Vary: "Origin",
   };
 }
 
 function allowedOrigin(request: Request, env: Env) {
   const origin = request.headers.get("Origin") || "";
-  const allowed = env.ALLOWED_ORIGINS
-    .split(",")
+  const allowed = env.ALLOWED_ORIGINS.split(",")
     .map((value) => value.trim())
     .filter(Boolean);
-
   return allowed.includes(origin) ? origin : allowed[0] || "";
 }
 
@@ -87,9 +88,7 @@ function parseModelJson(value: unknown): unknown {
     if (typeof response === "string") {
       return JSON.parse(stripCodeFence(response));
     }
-    if (response && typeof response === "object") {
-      return response;
-    }
+    if (response && typeof response === "object") return response;
   }
 
   const choices = object.choices;
@@ -99,7 +98,6 @@ function parseModelJson(value: unknown): unknown {
       first && typeof first.message === "object" && first.message
         ? (first.message as Record<string, unknown>)
         : undefined;
-
     const content = message?.content;
     if (typeof content === "string") {
       return JSON.parse(stripCodeFence(content));
@@ -160,10 +158,8 @@ function sanitizeAnalysis(
 
           const requestedId = asString(suggestion.elementId);
           const requestedName = asString(suggestion.elementName);
-
           const verified =
-            allowedById.get(requestedId) ||
-            allowedByName.get(requestedName);
+            allowedById.get(requestedId) || allowedByName.get(requestedName);
 
           if (!verified) return null;
 
@@ -177,11 +173,9 @@ function sanitizeAnalysis(
     : [];
 
   const missing =
-    raw.missingInformation &&
-    typeof raw.missingInformation === "object"
+    raw.missingInformation && typeof raw.missingInformation === "object"
       ? (raw.missingInformation as Record<string, unknown>)
       : null;
-
   const question = missing ? asString(missing.question) : "";
 
   return {
@@ -192,15 +186,36 @@ function sanitizeAnalysis(
     draftDescription: asString(raw.draftDescription),
     draftImpact: asString(raw.draftImpact),
     missingInformation: question
-      ? {
-          question,
-          reason: asString(missing?.reason),
-        }
+      ? { question, reason: asString(missing?.reason) }
       : null,
     warnings: Array.isArray(raw.warnings)
       ? raw.warnings.slice(0, 10).map(asString).filter(Boolean)
       : [],
   };
+}
+
+async function fileToMarkdown(file: File, env: Env) {
+  const converted = await env.AI.toMarkdown(
+    {
+      name: file.name,
+      blob: new Blob([await file.arrayBuffer()], {
+        type: file.type || "application/octet-stream",
+      }),
+    },
+    {
+      conversionOptions: {
+        output: { format: "markdown" },
+        pdf: { metadata: false },
+      },
+    }
+  );
+
+  const result = Array.isArray(converted) ? converted[0] : converted;
+  return result &&
+    "data" in result &&
+    typeof result.data === "string"
+    ? result.data.trim()
+    : "";
 }
 
 export default {
@@ -223,17 +238,36 @@ export default {
       await verifyFirebaseToken(request, env);
 
       const form = await request.formData();
-      const file = form.get("file");
+      const multi = form
+        .getAll("files")
+        .filter((value): value is File => value instanceof File);
+      const legacy = form.get("file");
+      const files = multi.length
+        ? multi
+        : legacy instanceof File
+        ? [legacy]
+        : [];
       const frameworkText = String(form.get("framework") || "[]");
 
-      if (!(file instanceof File)) {
+      if (!files.length) {
         return Response.json(
           { error: "FILE_REQUIRED" },
           { status: 400, headers: cors(origin) }
         );
       }
 
-      if (file.size > MAX_FILE_BYTES) {
+      if (files.length > MAX_FILES) {
+        return Response.json(
+          { error: "TOO_MANY_FILES" },
+          { status: 413, headers: cors(origin) }
+        );
+      }
+
+      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+      if (
+        totalBytes > MAX_TOTAL_BYTES ||
+        files.some((file) => file.size > MAX_FILE_BYTES)
+      ) {
         return Response.json(
           { error: "FILE_TOO_LARGE" },
           { status: 413, headers: cors(origin) }
@@ -256,7 +290,6 @@ export default {
                 item && typeof item === "object"
                   ? (item as Record<string, unknown>)
                   : {};
-
               return {
                 id: asString(data.id),
                 officialName: asString(data.officialName),
@@ -269,54 +302,48 @@ export default {
         framework = [];
       }
 
-      const converted = await env.AI.toMarkdown(
-        {
-          name: file.name,
-          blob: new Blob([await file.arrayBuffer()], {
-            type: file.type || "application/octet-stream",
-          }),
-        },
-        {
-          conversionOptions: {
-            output: { format: "markdown" },
-            pdf: { metadata: false },
-          },
+      const parts: string[] = [];
+      const unreadableFiles: string[] = [];
+
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        try {
+          const text = await fileToMarkdown(file, env);
+          if (text) {
+            parts.push(
+              `=== الملف ${index + 1}: ${file.name} ===\n${text}`
+            );
+          } else {
+            unreadableFiles.push(file.name);
+          }
+        } catch {
+          unreadableFiles.push(file.name);
         }
-      );
+      }
 
-      const conversionResult = Array.isArray(converted)
-        ? converted[0]
-        : converted;
-
-      const documentText =
-        conversionResult &&
-        "data" in conversionResult &&
-        typeof conversionResult.data === "string"
-          ? conversionResult.data
-          : "";
-
-      if (!documentText.trim()) {
+      if (!parts.length) {
         return Response.json(
           { error: "DOCUMENT_COULD_NOT_BE_READ" },
           { status: 422, headers: cors(origin) }
         );
       }
 
-      const evidence = documentText.slice(0, 120000);
-
+      const evidence = parts.join("\n\n").slice(0, 120000);
       const prompt = `
 You are Athari, an evidence-grounded assistant for teachers.
+
+The teacher uploaded ${files.length} attachment(s) together as ONE evidence item. Analyze the attachments jointly as one evidence package. A fact may be supported by one attachment or by several attachments, but never invent a relationship that is not shown in the evidence.
 
 NON-NEGOTIABLE RULES:
 - Never invent results, impact, dates, counts, people, organizations, percentages, or achievements.
 - Extract only facts directly supported by the supplied evidence.
-- "support" must briefly identify where the fact came from in the evidence, using a short Arabic label whenever possible.
+- "support" must identify the supporting attachment using a short Arabic label and, when useful, the original file name.
 - Use only performance elements in VERIFIED_FRAMEWORK.
 - If VERIFIED_FRAMEWORK is empty, suggestedClassifications must be [].
 - Suggest up to THREE classification elements only when each one is directly supported by the evidence.
 - Order suggestedClassifications from strongest evidence match to weakest supported match. The first suggestion is the recommended primary classification.
 - Each classification reason must independently explain the exact evidence that supports that element.
-- Do not add a classification merely because it is thematically related; there must be direct support in the evidence.
+- Do not add a classification merely because it is thematically related.
 - draftImpact must contain only impact directly supported by evidence.
 - If no impact is documented, write exactly: "لا يوجد أثر موثق متاح حاليًا."
 - Ask at most ONE essential missing-information question.
@@ -325,12 +352,9 @@ NON-NEGOTIABLE RULES:
 
 ARABIC OUTPUT RULES:
 - All user-facing generated text must be in clear Modern Standard Arabic, even when the evidence is in English.
-- This applies to extractedFacts.fact, extractedFacts.support, suggestedClassifications.reason, draftTitle, draftDescription, draftImpact, missingInformation.question, missingInformation.reason, and warnings.
 - Keep official performance element names exactly as they appear in VERIFIED_FRAMEWORK.
-- Proper nouns, organization names, product names, and original document titles may remain in their original language only when that preserves accuracy.
-- Do not copy long English sentences from the evidence into user-facing fields; summarize them faithfully in Arabic.
-- Preserve the distinction between facts explicitly documented in the evidence and draft wording suggested by Athari.
-- Do not add an Arabic fact unless its meaning is directly supported by the evidence.
+- Proper nouns, organization names, product names, and original document titles may remain in their original language only when needed for accuracy.
+- Do not copy long English sentences into user-facing fields; summarize them faithfully in Arabic.
 
 Required JSON shape:
 {
@@ -346,7 +370,7 @@ Required JSON shape:
 VERIFIED_FRAMEWORK:
 ${JSON.stringify(framework)}
 
-EVIDENCE:
+EVIDENCE PACKAGE:
 ${evidence}
 `;
 
@@ -355,30 +379,37 @@ ${evidence}
           {
             role: "system",
             content:
-              "Return one valid JSON object only. Evidence-grounded. Never fabricate. Write all user-facing generated text in clear Modern Standard Arabic, while preserving official framework names and necessary proper nouns exactly.",
+              "Return one valid JSON object only. Evidence-grounded. Never fabricate. Treat all supplied attachments as one evidence package and write user-facing text in clear Modern Standard Arabic.",
           },
           { role: "user", content: prompt },
         ],
         temperature: 0.1,
-        max_completion_tokens: 1200,
-        chat_template_kwargs: {
-          enable_thinking: false,
-        },
+        max_completion_tokens: 1400,
+        chat_template_kwargs: { enable_thinking: false },
       });
 
       const parsed = parseModelJson(aiResult);
       const safe = sanitizeAnalysis(parsed, framework);
+      const conversionWarnings = unreadableFiles.map(
+        (name) => `تعذر قراءة الملف «${name}» ضمن هذه المحاولة.`
+      );
 
-      return Response.json(safe, {
-        headers: {
-          ...cors(origin),
-          "Cache-Control": "no-store",
+      return Response.json(
+        {
+          ...safe,
+          unreadableFiles,
+          warnings: [...safe.warnings, ...conversionWarnings].slice(0, 10),
         },
-      });
+        {
+          headers: {
+            ...cors(origin),
+            "Cache-Control": "no-store",
+          },
+        }
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "UNKNOWN_ERROR";
-
       const status =
         message === "UNAUTHORIZED"
           ? 401

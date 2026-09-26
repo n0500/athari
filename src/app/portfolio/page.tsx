@@ -8,6 +8,7 @@ import { firebaseConfigured, requireAuth } from "@/lib/firebase";
 import { listUserEvidence } from "@/lib/firestore";
 import {
   ApprovedClassification,
+  EvidenceAttachment,
   EvidenceRecord,
 } from "@/types/athari";
 
@@ -35,6 +36,21 @@ function classificationsFor(item: EvidenceRecord): ApprovedClassification[] {
   }
 
   return [];
+}
+
+function attachmentsFor(item: EvidenceRecord): EvidenceAttachment[] {
+  if (item.attachments?.length) return item.attachments;
+  return [
+    {
+      originalFileName: item.originalFileName,
+      mimeType: item.mimeType,
+      fileSize: item.fileSize,
+      ...(item.driveFileId ? { driveFileId: item.driveFileId } : {}),
+      ...(item.driveWebViewLink
+        ? { driveWebViewLink: item.driveWebViewLink }
+        : {}),
+    },
+  ];
 }
 
 export default function PortfolioPage() {
@@ -132,6 +148,7 @@ export default function PortfolioPage() {
             <div className="portfolio-evidence-list">
               {evidence.map(({ item, classification }) => {
                 const shared = classificationsFor(item).length > 1;
+                const attachments = attachmentsFor(item);
 
                 return (
                   <article
@@ -149,7 +166,11 @@ export default function PortfolioPage() {
                       ) : null}
                     </div>
 
-                    <span>{item.originalFileName}</span>
+                    <span>
+                      {attachments.length === 1
+                        ? attachments[0].originalFileName
+                        : `${attachments.length} ملفات أصلية`}
+                    </span>
 
                     {classification.reason ? (
                       <p className="classification-reason">
@@ -157,15 +178,27 @@ export default function PortfolioPage() {
                       </p>
                     ) : null}
 
-                    {item.driveWebViewLink ? (
-                      <a
-                        href={item.driveWebViewLink}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        فتح الأصل في Drive
-                      </a>
-                    ) : null}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        marginTop: 8,
+                      }}
+                    >
+                      {attachments.map((attachment, attachmentIndex) =>
+                        attachment.driveWebViewLink ? (
+                          <a
+                            key={`${attachment.originalFileName}-${attachmentIndex}`}
+                            href={attachment.driveWebViewLink}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            فتح {attachments.length === 1 ? "الأصل" : `الملف ${attachmentIndex + 1}`}
+                          </a>
+                        ) : null
+                      )}
+                    </div>
                   </article>
                 );
               })}
@@ -174,19 +207,17 @@ export default function PortfolioPage() {
         ))}
 
         {!loading && !error && grouped.length === 0 ? (
-          <div className="setup-notice">
-            لا توجد شواهد معتمدة بعد.
-          </div>
+          <div className="setup-notice">لا توجد شواهد معتمدة بعد.</div>
         ) : null}
       </div>
 
       <section className="coverage-note">
         <Icon name="sparkle" size={20} />
         <div>
-          <strong>شاهد واحد، أكثر من عنصر عند الحاجة</strong>
+          <strong>شاهد واحد قد يتكون من عدة ملفات ويخدم عدة عناصر</strong>
           <p>
-            يحتفظ Google Drive بنسخة أصلية واحدة داخل مجلد التصنيف الأساسي،
-            بينما يفهرس أثري الشاهد نفسه تحت كل العناصر التي اعتمدتها.
+            يحفظ أثري حزمة الملفات مرة واحدة في Google Drive، ثم يفهرس
+            الشاهد نفسه تحت كل عناصر الأداء التي اعتمدتها دون نسخ إضافية.
           </p>
         </div>
       </section>

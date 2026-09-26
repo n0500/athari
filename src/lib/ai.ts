@@ -23,7 +23,7 @@ function analysisIsEmpty(analysis: AiAnalysis) {
 }
 
 async function requestAnalysis(
-  file: File,
+  files: File[],
   framework: FrameworkElement[]
 ): Promise<AiAnalysis> {
   const user = requireAuth().currentUser;
@@ -31,17 +31,14 @@ async function requestAnalysis(
 
   const idToken = await user.getIdToken();
   const form = new FormData();
-  form.append("file", file);
+  files.forEach((file) => form.append("files", file));
   form.append("framework", JSON.stringify(framework));
 
-  const response = await fetch(
-    `${endpoint.replace(/\/$/, "")}/analyze`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${idToken}` },
-      body: form,
-    }
-  );
+  const response = await fetch(`${endpoint.replace(/\/$/, "")}/analyze`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}` },
+    body: form,
+  });
 
   if (response.status === 429) {
     throw new Error("AI_FREE_LIMIT_REACHED");
@@ -53,7 +50,7 @@ async function requestAnalysis(
       const payload = (await response.json()) as { error?: string };
       apiError = payload.error ?? "";
     } catch {
-      // Keep the status-based fallback below.
+      // Keep status-based fallback below.
     }
 
     if (response.status === 422) {
@@ -66,54 +63,93 @@ async function requestAnalysis(
   return response.json() as Promise<AiAnalysis>;
 }
 
-export async function analyzeEvidence(
-  file: File,
-  framework: FrameworkElement[]
-): Promise<AiAnalysis> {
-  let firstError: Error | null = null;
+async function replaceUnreadablePdfs(
+  files: File[],
+  unreadableNames?: string[]
+) {
+  const unreadable = new Set(unreadableNames ?? []);
+  const replaceAllPdfs = unreadable.size === 0;
+  let changed = false;
 
-  try {
-    const direct = await requestAnalysis(file, framework);
+  const normalized: File[] = [];
 
-    if (!isPdf(file) || !analysisIsEmpty(direct)) {
-      return direct;
+  for (const file of files) {
+    const shouldConvert =
+      isPdf(file) && (replaceAllPdfs || unreadable.has(file.name));
+
+    if (!shouldConvert) {
+      normalized.push(file);
+      continue;
     }
 
-    firstError = new Error("AI_EMPTY_ANALYSIS");
+    try {
+      const fallback = await renderPdfForAiFallback(file);
+      if (fallback) {
+        normalized.push(fallback);
+        changed = true;
+      } else {
+        normalized.push(file);
+      }
+    } catch {
+      normalized.push(file);
+    }
+  }
+
+  return { normalized, changed };
+}
+
+export async function analyzeEvidence(
+  input: File | File[],
+  framework: FrameworkElement[]
+): Promise<AiAnalysis> {
+  const files = Array.isArray(input) ? input : [input];
+  if (!files.length) throw new Error("FILE_REQUIRED");
+
+  let direct: AiAnalysis | null = null;
+  let directError: Error | null = null;
+
+  try {
+    direct = await requestAnalysis(files, framework);
   } catch (error) {
     const current =
       error instanceof Error ? error : new Error("AI_UNKNOWN_ERROR");
 
     if (
-      !isPdf(file) ||
       current.message === "AI_FREE_LIMIT_REACHED" ||
       current.message === "AUTH_REQUIRED"
     ) {
       throw current;
     }
 
-    firstError = current;
+    directError = current;
   }
 
-  let fallbackImage: File | null = null;
+  const unreadablePdfs = direct?.unreadableFiles?.filter((name) =>
+    files.some((file) => file.name === name && isPdf(file))
+  );
 
-  try {
-    fallbackImage = await renderPdfForAiFallback(file);
-  } catch (error) {
-    const current =
-      error instanceof Error ? error : new Error("PDF_VISUAL_FALLBACK_FAILED");
-    throw current;
+  const shouldTryVisualFallback =
+    files.some(isPdf) &&
+    (!direct ||
+      analysisIsEmpty(direct) ||
+      Boolean(unreadablePdfs?.length));
+
+  if (!shouldTryVisualFallback && direct) {
+    return direct;
   }
 
-  if (!fallbackImage) {
-    throw firstError ?? new Error("AI_DOCUMENT_UNREADABLE");
+  if (shouldTryVisualFallback) {
+    const { normalized, changed } = await replaceUnreadablePdfs(
+      files,
+      unreadablePdfs
+    );
+
+    if (changed) {
+      const visual = await requestAnalysis(normalized, framework);
+      if (!analysisIsEmpty(visual)) return visual;
+    }
   }
 
-  const visual = await requestAnalysis(fallbackImage, framework);
-
-  if (analysisIsEmpty(visual)) {
-    throw new Error("AI_VISUAL_ANALYSIS_EMPTY");
-  }
-
-  return visual;
+  if (direct) return direct;
+  throw directError ?? new Error("AI_DOCUMENT_UNREADABLE");
 }
