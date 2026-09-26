@@ -6,6 +6,6 @@
   "ai": { "binding": "AI" },
   "vars": {
     "FIREBASE_PROJECT_ID": "athari-f07a7",
-    "ALLOWED_ORIGINS": "https://athari-f07a7.web.app"
+    "ALLOWED_ORIGINS": "https://athari-f07a7.web.app,https://athari.pages.dev"
   }
 }
