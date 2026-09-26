@@ -9,20 +9,9 @@ export type EvidenceStatus =
   | "analysis_failed"
   | "archived";
 
-export type ExtractedFact = {
-  fact: string;
-  support?: string;
-};
-
-export type SuggestedClassification = {
-  elementId: string;
-  elementName: string;
-  reason: string;
-};
-
-export type MissingInformation =
-  | { question: string; reason?: string }
-  | null;
+export type ExtractedFact = { fact: string; support?: string };
+export type SuggestedClassification = { elementId: string; elementName: string; reason: string };
+export type MissingInformation = { question: string; reason?: string } | null;
 
 export type AiAnalysis = {
   extractedFacts: ExtractedFact[];
@@ -42,10 +31,8 @@ export type ApprovedClassification = {
 };
 
 export type ApprovedContent = {
-  // Primary classification. Kept for backwards compatibility.
   elementId: string;
   elementName: string;
-  // A single evidence item may support up to three verified elements.
   classifications?: ApprovedClassification[];
   title: string;
   description: string;
@@ -60,14 +47,17 @@ export type EvidenceRecord = {
   originalFileName: string;
   mimeType: string;
   fileSize: number;
+  contentHash?: string;
   driveFileId?: string;
   driveWebViewLink?: string;
   driveParentFolderId?: string;
   aiAnalysis?: AiAnalysis;
   approvedContent?: ApprovedContent;
+  archiveReason?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
   approvedAt?: unknown;
+  archivedAt?: unknown;
 };
 
 export type FrameworkElement = {
