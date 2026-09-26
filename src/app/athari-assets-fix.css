@@ -1,0 +1,62 @@
+/* Athari assets fix — custom lightweight illustrations with safe title space */
+:root {
+  --athari-asset-shadow: 0 10px 28px rgba(26, 74, 111, 0.08);
+}
+
+/* Small element cards */
+.exact-element-art,
+.share-v5-element-icon {
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  overflow: hidden !important;
+  box-shadow: var(--athari-asset-shadow) !important;
+}
+
+/* Preview/detail thumbnails */
+.exact-detail-thumb,
+.share-v5-detail-evidence-icon {
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  overflow: hidden !important;
+}
+
+/* Hero illustrations on detail/share pages */
+.exact-element-hero > img {
+  object-fit: contain !important;
+  object-position: center center !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0)) !important;
+}
+
+.share-v5-detail-art,
+.exact-hero-art,
+.share-v5-hero-art {
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+}
+
+/* Keep more breathing room so titles stay readable */
+@media (max-width: 760px) {
+  .exact-element-art,
+  .share-v5-element-icon {
+    background-size: contain !important;
+    background-position: center center !important;
+  }
+
+  .exact-detail-thumb,
+  .share-v5-detail-evidence-icon {
+    background-size: contain !important;
+    background-position: center center !important;
+  }
+
+  .share-v5-detail-art,
+  .exact-hero-art,
+  .share-v5-hero-art,
+  .exact-element-hero > img {
+    background-size: contain !important;
+    object-fit: contain !important;
+    object-position: center center !important;
+  }
+}
