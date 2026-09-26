@@ -24,6 +24,12 @@ function saveDriveToken(token?: string | null) {
   }
 }
 
+export function clearStoredDriveToken() {
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem(DRIVE_TOKEN_KEY);
+  }
+}
+
 export function getStoredDriveToken() {
   if (typeof window === "undefined") return null;
   return sessionStorage.getItem(DRIVE_TOKEN_KEY);
@@ -56,8 +62,6 @@ export async function ensureDriveAccessToken(): Promise<string> {
 }
 
 export async function logout() {
-  if (typeof window !== "undefined") {
-    sessionStorage.removeItem(DRIVE_TOKEN_KEY);
-  }
+  clearStoredDriveToken();
   await signOut(requireAuth());
 }

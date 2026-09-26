@@ -120,8 +120,13 @@ function ReviewInner() {
       });
 
       router.push("/portfolio");
-    } catch {
-      setError("تعذر الاعتماد الآن. الأصل لم يُحذف من Drive.");
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : "UNKNOWN";
+      setError(
+        raw === "DRIVE_RECONNECT_REQUIRED"
+          ? "انتهت جلسة Drive. اضغطي «اعتماد وترتيب في Drive» مرة أخرى لإعادة الربط تلقائيًا."
+          : "تعذر الاعتماد الآن. الأصل لم يُحذف من Drive."
+      );
     } finally {
       setSaving(false);
     }
@@ -206,7 +211,7 @@ function ReviewInner() {
           </div>
         ) : (
           <p className="muted-copy">
-            لا يوجد إطار أداء موثق داخل المشروع بعد، لذلك لم يختلق أثري تصنيفًا.
+            لم يجد أثري تصنيفًا موثقًا مناسبًا لهذا الشاهد.
           </p>
         )}
       </SectionCard>

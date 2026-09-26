@@ -111,7 +111,7 @@ export default function NewEvidencePage() {
         raw === "AI_FREE_LIMIT_REACHED"
           ? "اكتملت حصة AI المجانية اليوم. الشاهد محفوظ في Drive ويمكن تحليله لاحقًا."
           : raw === "DRIVE_RECONNECT_REQUIRED"
-          ? "انتهت جلسة Drive. أعيدي ربط الحساب ثم حاولي مرة أخرى."
+          ? "انتهت جلسة Drive. اضغطي «حفظ وتحليل الشاهد» مرة أخرى لإعادة الربط تلقائيًا."
           : "تعذر إكمال العملية الآن. إذا تم حفظ الملف في Drive فلن يضيع."
       );
     } finally {

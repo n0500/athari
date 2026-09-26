@@ -1,3 +1,5 @@
+import { clearStoredDriveToken } from "@/lib/auth";
+
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3";
 
@@ -25,7 +27,11 @@ async function driveJson<T>(
     },
   });
 
-  if (response.status === 401) throw new Error("DRIVE_RECONNECT_REQUIRED");
+  if (response.status === 401) {
+    clearStoredDriveToken();
+    throw new Error("DRIVE_RECONNECT_REQUIRED");
+  }
+
   if (!response.ok) throw new Error(`DRIVE_ERROR_${response.status}`);
   return response.json() as Promise<T>;
 }
@@ -192,6 +198,12 @@ export async function upsertAthariBackup(
         body: json,
       }
     );
+
+    if (response.status === 401) {
+      clearStoredDriveToken();
+      throw new Error("DRIVE_RECONNECT_REQUIRED");
+    }
+
     if (!response.ok) throw new Error("DRIVE_BACKUP_UPDATE_FAILED");
     return backup.id;
   }
