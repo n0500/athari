@@ -4,6 +4,7 @@ import "./athari-v2.css";
 import "./athari-v4.css";
 import "./share-v5.css";
 import "./athari-final.css";
+import "./athari-premium.css";
 
 export const metadata: Metadata = {
   title: "أثري | ملف الأداء الذكي",
