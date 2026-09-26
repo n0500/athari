@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 430">
+  <defs>
+    <linearGradient id="gBlue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3394ff"/><stop offset="1" stop-color="#1555d6"/></linearGradient>
+    <linearGradient id="gTeal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22b7a0"/><stop offset="1" stop-color="#087266"/></linearGradient>
+    <linearGradient id="gNavy" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#19779a"/><stop offset="1" stop-color="#0b4b79"/></linearGradient>
+    <linearGradient id="gPaper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffdf5"/><stop offset="1" stop-color="#f0e5cd"/></linearGradient>
+    <linearGradient id="gLeaf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5dd6ad"/><stop offset="1" stop-color="#0c7a62"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="170%" height="180%"><feDropShadow dx="0" dy="15" stdDeviation="14" flood-color="#062f59" flood-opacity=".26"/></filter>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0b4c72" flood-opacity=".16"/></filter>
+  </defs>
+  <g opacity=".9">
+    <path d="M25 330C5 270 16 214 53 178c34-32 80-40 119-21 45 21 61 64 47 110-15 49-66 93-118 105-32 8-63-9-76-42Z" fill="#49c5aa" opacity=".28"/>
+    <path d="M379 345c-12-47 7-90 44-113 34-21 72-14 89 15 18 31 3 74-27 108-29 32-74 46-106 24-12-8-17-20-16-34Z" fill="#63b7ff" opacity=".22"/>
+  </g>
+  <g filter="url(#shadow)">
+    <path d="M72 118h116c16 0 28 12 28 28v202H58V146c0-16 0-28 14-28Z" fill="url(#gBlue)" transform="rotate(-7 137 233)"/>
+    <path d="M140 90h128c16 0 28 12 28 28v236H124V118c0-16 0-28 16-28Z" fill="url(#gTeal)" transform="rotate(2 210 222)"/>
+    <path d="M226 108h118c14 0 25 11 25 25v222H211V133c0-14 0-25 15-25Z" fill="url(#gNavy)" transform="rotate(7 290 231)"/>
+    <rect x="296" y="143" width="128" height="176" rx="20" fill="url(#gPaper)" transform="rotate(8 360 231)"/>
+  </g>
+  <g filter="url(#soft)">
+    <rect x="74" y="235" width="105" height="136" rx="20" fill="#f7fcff" transform="rotate(-8 126 303)"/>
+    <rect x="98" y="328" width="12" height="22" rx="6" fill="#3ec8a6"/>
+    <rect x="120" y="304" width="12" height="46" rx="6" fill="#2fa7f5"/>
+    <rect x="142" y="278" width="12" height="72" rx="6" fill="#1671d9"/>
+    <rect x="164" y="315" width="12" height="35" rx="6" fill="#49d3b3"/>
+  </g>
+  <g>
+    <path d="M23 286c17-49 52-75 104-78-5 50-39 83-104 78Z" fill="url(#gLeaf)" opacity=".98"/>
+    <path d="M399 217c10-54 42-89 98-106 7 55-25 97-98 106Z" fill="url(#gLeaf)" opacity=".95"/>
+    <path d="M430 317c1-42 22-71 63-86 11 42-11 79-63 86Z" fill="url(#gLeaf)" opacity=".8"/>
+  </g>
+  <g filter="url(#soft)">
+    <rect x="205" y="275" width="18" height="106" rx="9" fill="#ffc15c" transform="rotate(12 214 328)"/>
+    <path d="M204 276l12-18 6 21Z" fill="#f1d5aa"/>
+    <rect x="202" y="339" width="18" height="16" rx="5" fill="#245fb9" transform="rotate(12 211 347)"/>
+  </g>
+  <g fill="#ffd884">
+    <path d="M394 68l7 18 18 7-18 7-7 18-7-18-18-7 18-7Z"/>
+    <path d="M322 35l4 10 10 4-10 4-4 10-4-10-10-4 10-4Z" opacity=".9"/>
+  </g>
+</svg>

@@ -1,0 +1,160 @@
+/* Athari final visual layer — aligns Portfolio + Principal view to the approved concept. */
+:root {
+  --af-navy:#0b2557;
+  --af-blue:#1975f3;
+  --af-teal:#08796f;
+  --af-teal-dark:#075768;
+  --af-mint:#e9faf4;
+  --af-sky:#edf7ff;
+  --af-violet:#f2edff;
+  --af-amber:#fff4db;
+  --af-rose:#fff0f3;
+  --af-bg:#f7fbff;
+  --af-line:#dfe9f2;
+  --af-shadow:0 18px 48px rgba(26,72,117,.10);
+}
+html,body{max-width:100%;overflow-x:hidden;background:linear-gradient(180deg,#fff 0,#f8fbff 34%,#f4f9fd 100%)!important}
+
+/* ===== Logged-in portfolio ===== */
+.v4-portfolio-hero{
+  min-height:350px!important;
+  padding:30px 28px!important;
+  border-radius:34px!important;
+  grid-template-columns:minmax(0,1fr) 118px!important;
+  background-image:url('/athari-hero-art.svg'),radial-gradient(circle at 12% 12%,rgba(115,235,219,.28),transparent 27%),linear-gradient(135deg,#0e8a80 0%,#08766f 48%,#07596a 100%)!important;
+  background-repeat:no-repeat,no-repeat,no-repeat!important;
+  background-size:48% auto,auto,auto!important;
+  background-position:left 12px center,center,center!important;
+  box-shadow:0 28px 68px rgba(18,88,101,.20)!important;
+}
+.v4-hero-illustration{display:none!important}
+.v4-portfolio-hero-copy{max-width:58%;justify-self:end;text-align:right!important}
+.v4-portfolio-hero h2{font-size:clamp(31px,7vw,43px)!important;line-height:1.2!important;margin-top:15px!important}
+.v4-portfolio-hero p{font-size:13px!important}
+.v4-progress-wrap{align-self:center!important}
+.v4-progress-ring{width:118px!important;height:118px!important;box-shadow:0 14px 35px rgba(0,0,0,.18)!important}
+.v4-progress-core strong{font-size:29px!important}
+.v4-action-card{min-height:98px!important;border-radius:25px!important}
+.v4-action-card strong{font-size:17px!important}
+.v4-element-card{min-height:178px!important;border-radius:24px!important;padding:17px!important}
+.v4-element-icon{width:62px!important;height:62px!important;border-radius:19px!important}
+.v4-element-card strong{font-size:13.5px!important}
+.v4-section-heading h2{font-size:27px!important}
+
+/* ===== Principal / public share ===== */
+.share-v5-shell{background:radial-gradient(circle at 100% 0,rgba(105,188,255,.15),transparent 30rem),radial-gradient(circle at 0 22%,rgba(85,206,174,.10),transparent 28rem),#f8fbff!important;color:var(--af-navy)!important}
+.share-v5-page{width:min(100%,960px)!important}
+.share-v5-topbar{min-height:86px!important;padding:0 4px!important}
+.share-v5-brand strong{font-size:21px!important;color:var(--af-navy)!important}
+.share-v5-safe-badge{font-size:10px!important;padding:0 14px!important}
+.share-v5-hero{
+  min-height:360px!important;
+  padding:32px 34px!important;
+  border-radius:35px!important;
+  grid-template-columns:minmax(0,1fr) 132px!important;
+  gap:20px!important;
+  background-image:url('/athari-hero-art.svg'),radial-gradient(circle at 14% 12%,rgba(100,231,211,.25),transparent 22rem),linear-gradient(135deg,#0d8e84 0%,#08776f 48%,#07546a 100%)!important;
+  background-repeat:no-repeat,no-repeat,no-repeat!important;
+  background-size:49% auto,auto,auto!important;
+  background-position:left 14px center,center,center!important;
+  box-shadow:0 27px 66px rgba(21,92,107,.18)!important;
+}
+.share-v5-hero-art{display:none!important}
+.share-v5-hero-copy{max-width:59%!important;justify-self:end!important;text-align:right!important}
+.share-v5-kicker{margin-top:16px!important;font-size:13px!important}
+.share-v5-hero h1{font-size:0!important;margin:10px 0 9px!important;line-height:1.14!important}
+.share-v5-hero h1::after{content:"أ. نهى المطيري";display:block;font-size:42px;font-weight:900;letter-spacing:-.7px;color:#fff}
+.share-v5-hero-copy>p{font-size:13px!important;color:rgba(255,255,255,.86)!important}
+.share-v5-ring{width:126px!important;height:126px!important;align-self:center!important}
+.share-v5-ring>div{width:98px!important;height:98px!important}
+.share-v5-ring strong{font-size:31px!important}
+.share-v5-hero-buttons{margin-top:22px!important}
+.share-v5-primary-btn,.share-v5-secondary-btn{min-height:48px!important;padding:0 18px!important;font-size:11px!important;border-radius:14px!important}
+.share-v5-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important;margin-top:14px!important}
+.share-v5-summary-card{min-height:108px!important;border-radius:21px!important;padding:16px!important}
+.share-v5-summary-card>span{width:48px!important;height:48px!important}
+.share-v5-summary-card strong{font-size:18px!important}
+.share-v5-section{margin-top:31px!important}
+.share-v5-section-head h2{font-size:28px!important;color:var(--af-navy)!important}
+.share-v5-section-head p{font-size:10.5px!important}
+.share-v5-elements-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important}
+.share-v5-element-card{min-height:155px!important;border-radius:24px!important;padding:18px!important;box-shadow:0 13px 31px rgba(35,75,112,.06)!important}
+.share-v5-element-icon{width:64px!important;height:64px!important;border-radius:20px!important}
+.share-v5-element-card strong{font-size:13.5px!important;line-height:1.55!important}
+.share-v5-element-card small{font-size:9px!important}
+.share-v5-evidence-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:14px!important}
+.share-v5-evidence-card{min-height:235px!important;border-radius:24px!important;box-shadow:0 15px 34px rgba(35,76,111,.07)!important}
+.share-v5-evidence-visual{width:41%!important;min-width:132px!important}
+.share-v5-evidence-icon{width:80px!important;height:80px!important}
+.share-v5-evidence-content h3{font-size:13.5px!important}
+
+/* Detail page — same airy visual language as the approved concept */
+.share-v5-detail-hero{min-height:310px!important;border-radius:33px!important;box-shadow:0 20px 50px rgba(34,88,112,.10)!important}
+.share-v5-detail-copy h1{font-size:clamp(31px,4.8vw,44px)!important}
+.share-v5-detail-card{border-radius:25px!important;box-shadow:0 15px 36px rgba(41,79,112,.07)!important}
+.share-v5-support-item{border-radius:18px!important}
+.share-v5-detail-evidence{border-radius:19px!important}
+
+/* Force the intended mobile proportions even inside iOS in-app browsers. */
+@media (max-width:760px), (pointer:coarse) and (max-device-width:980px){
+  .v4-portfolio-hero{min-height:355px!important;padding:25px 20px!important;background-size:50% auto,auto,auto!important;background-position:left 2px top 36px,center,center!important;grid-template-columns:1fr!important;align-content:end!important}
+  .v4-portfolio-hero-copy{max-width:70%!important;margin-right:auto!important;padding-bottom:2px!important}
+  .v4-portfolio-hero h2{font-size:31px!important}
+  .v4-progress-wrap{position:absolute!important;left:20px!important;bottom:26px!important}
+  .v4-progress-ring{width:98px!important;height:98px!important}
+  .v4-progress-core strong{font-size:24px!important}
+  .v4-progress-core span{font-size:8px!important}
+  .v4-element-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .v4-element-card{min-height:158px!important}
+
+  .share-v5-shell{padding:0 0 30px!important}
+  .share-v5-page{width:100%!important;max-width:100%!important}
+  .share-v5-topbar{padding:0 18px!important;min-height:78px!important}
+  .share-v5-print-btn{display:none!important}
+  .share-v5-hero{margin:0 18px!important;min-height:365px!important;padding:25px 20px!important;border-radius:31px!important;grid-template-columns:1fr!important;align-content:end!important;background-size:52% auto,auto,auto!important;background-position:left -2px top 24px,center,center!important}
+  .share-v5-hero-copy{max-width:70%!important;margin-right:auto!important;justify-self:end!important;padding-bottom:0!important}
+  .share-v5-hero h1::after{font-size:31px!important}
+  .share-v5-kicker{font-size:10px!important;margin-top:11px!important}
+  .share-v5-hero-copy>p{font-size:10.5px!important;max-width:100%!important}
+  .share-v5-ring{position:absolute!important;left:20px!important;bottom:24px!important;width:98px!important;height:98px!important}
+  .share-v5-ring>div{width:76px!important;height:76px!important}
+  .share-v5-ring strong{font-size:24px!important}
+  .share-v5-ring span{font-size:7px!important}
+  .share-v5-hero-buttons{padding-left:100px!important;margin-top:15px!important;gap:7px!important;flex-wrap:nowrap!important}
+  .share-v5-primary-btn,.share-v5-secondary-btn{min-height:39px!important;padding:0 11px!important;font-size:8.5px!important;border-radius:11px!important}
+  .share-v5-summary-grid{margin:12px 18px 0!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important}
+  .share-v5-summary-card{min-height:86px!important;padding:11px 10px!important;gap:8px!important;border-radius:17px!important;flex-direction:column!important;align-items:flex-start!important}
+  .share-v5-summary-card>span{width:36px!important;height:36px!important;border-radius:11px!important}
+  .share-v5-summary-card strong{font-size:14px!important}
+  .share-v5-summary-card small{font-size:7px!important}
+  .share-v5-section{margin:26px 18px 0!important}
+  .share-v5-section-head h2{font-size:23px!important}
+  .share-v5-elements-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+  .share-v5-element-card{min-height:145px!important;padding:14px 13px!important;flex-direction:column!important;align-items:flex-start!important;gap:8px!important}
+  .share-v5-element-icon{width:50px!important;height:50px!important;border-radius:15px!important}
+  .share-v5-element-card strong{font-size:10.5px!important}
+  .share-v5-element-card small{font-size:7.5px!important}
+  .share-v5-evidence-grid{grid-template-columns:1fr!important}
+  .share-v5-evidence-card{min-height:190px!important}
+  .share-v5-evidence-visual{width:34%!important;min-width:110px!important}
+  .share-v5-evidence-icon{width:66px!important;height:66px!important}
+  .share-v5-evidence-content{padding:14px!important}
+  .share-v5-evidence-content h3{font-size:11.5px!important}
+  .share-v5-evidence-content p{font-size:8.5px!important}
+  .share-v5-breadcrumb,.share-v5-detail-hero,.share-v5-detail-card{margin-left:18px!important;margin-right:18px!important}
+  .share-v5-detail-hero{min-height:455px!important;grid-template-columns:1fr!important;align-content:end!important;padding:22px 18px!important}
+  .share-v5-detail-art{position:absolute!important;left:12px!important;right:12px!important;top:8px!important;height:215px!important}
+  .share-v5-detail-copy{padding-top:180px!important}
+  .share-v5-detail-copy h1{font-size:29px!important}
+  .share-v5-support-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important}
+  .share-v5-support-item{min-height:116px!important;padding:10px!important}
+  .share-v5-support-item strong{font-size:9px!important}
+}
+
+@media (max-width:390px){
+  .share-v5-hero{margin-left:12px!important;margin-right:12px!important}
+  .share-v5-summary-grid,.share-v5-section,.share-v5-breadcrumb,.share-v5-detail-hero,.share-v5-detail-card{margin-left:12px!important;margin-right:12px!important}
+  .share-v5-hero-copy{max-width:72%!important}
+  .share-v5-hero h1::after{font-size:29px!important}
+  .share-v5-support-grid{grid-template-columns:1fr!important}
+}
