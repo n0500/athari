@@ -1,11 +1,28 @@
 import { requireAuth } from "@/lib/firebase";
+import { renderPdfForAiFallback } from "@/lib/pdfFallback";
 import { AiAnalysis, FrameworkElement } from "@/types/athari";
 
 const endpoint =
   process.env.NEXT_PUBLIC_ATHARI_AI_URL ??
   "https://athari-ai.t720711.workers.dev";
 
-export async function analyzeEvidence(
+function isPdf(file: File) {
+  return (
+    file.type === "application/pdf" ||
+    file.name.toLowerCase().endsWith(".pdf")
+  );
+}
+
+function analysisIsEmpty(analysis: AiAnalysis) {
+  return (
+    !analysis.extractedFacts?.length &&
+    !analysis.suggestedClassifications?.length &&
+    !analysis.draftTitle?.trim() &&
+    !analysis.draftDescription?.trim()
+  );
+}
+
+async function requestAnalysis(
   file: File,
   framework: FrameworkElement[]
 ): Promise<AiAnalysis> {
@@ -29,9 +46,69 @@ export async function analyzeEvidence(
   if (response.status === 429) {
     throw new Error("AI_FREE_LIMIT_REACHED");
   }
+
   if (!response.ok) {
-    throw new Error(`AI_ERROR_${response.status}`);
+    let apiError = "";
+    try {
+      const payload = (await response.json()) as { error?: string };
+      apiError = payload.error ?? "";
+    } catch {
+      // Keep the status-based fallback below.
+    }
+
+    if (response.status === 422) {
+      throw new Error(apiError || "AI_DOCUMENT_UNREADABLE");
+    }
+
+    throw new Error(apiError || `AI_ERROR_${response.status}`);
   }
 
   return response.json() as Promise<AiAnalysis>;
+}
+
+export async function analyzeEvidence(
+  file: File,
+  framework: FrameworkElement[]
+): Promise<AiAnalysis> {
+  let firstError: Error | null = null;
+
+  try {
+    const direct = await requestAnalysis(file, framework);
+
+    if (!isPdf(file) || !analysisIsEmpty(direct)) {
+      return direct;
+    }
+
+    firstError = new Error("AI_EMPTY_ANALYSIS");
+  } catch (error) {
+    const current =
+      error instanceof Error ? error : new Error("AI_UNKNOWN_ERROR");
+
+    if (
+      !isPdf(file) ||
+      current.message === "AI_FREE_LIMIT_REACHED" ||
+      current.message === "AUTH_REQUIRED"
+    ) {
+      throw current;
+    }
+
+    firstError = current;
+  }
+
+  // Image-only/scanned PDFs can contain no usable text layer. Render up to
+  // three pages locally, then send only that temporary JPEG to the same
+  // Workers AI endpoint. The original PDF remains stored in the user's Drive.
+  const fallbackImage = await renderPdfForAiFallback(file);
+
+  if (!fallbackImage) {
+    throw firstError ?? new Error("AI_DOCUMENT_UNREADABLE");
+  }
+
+  const visual = await requestAnalysis(fallbackImage, framework);
+
+  if (analysisIsEmpty(visual)) {
+    throw firstError ?? new Error("AI_DOCUMENT_UNREADABLE");
+  }
+
+  return visual;
 }
