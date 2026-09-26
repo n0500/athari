@@ -15,23 +15,19 @@ import type { EvidenceAttachment, EvidenceRecord } from "@/types/athari";
 function itemCoversElement(item: EvidenceRecord, elementId: string) {
   const approved = item.approvedContent;
   if (!approved) return false;
-  if (approved.classifications?.length) {
-    return approved.classifications.some((entry) => entry.elementId === elementId);
-  }
+  if (approved.classifications?.length) return approved.classifications.some((entry) => entry.elementId === elementId);
   return approved.elementId === elementId;
 }
 
 function attachmentsFor(item: EvidenceRecord): EvidenceAttachment[] {
   if (item.attachments?.length) return item.attachments;
-  return [
-    {
-      originalFileName: item.originalFileName,
-      mimeType: item.mimeType,
-      fileSize: item.fileSize,
-      ...(item.driveFileId ? { driveFileId: item.driveFileId } : {}),
-      ...(item.driveWebViewLink ? { driveWebViewLink: item.driveWebViewLink } : {}),
-    },
-  ];
+  return [{
+    originalFileName: item.originalFileName,
+    mimeType: item.mimeType,
+    fileSize: item.fileSize,
+    ...(item.driveFileId ? { driveFileId: item.driveFileId } : {}),
+    ...(item.driveWebViewLink ? { driveWebViewLink: item.driveWebViewLink } : {}),
+  }];
 }
 
 function ElementPageInner() {
@@ -50,15 +46,10 @@ function ElementPageInner() {
         setLoading(false);
         return;
       }
-
       try {
         setError("");
         const all = await listUserEvidence(user.uid);
-        setItems(
-          all.filter(
-            (item) => item.status === "approved" && itemCoversElement(item, elementId)
-          )
-        );
+        setItems(all.filter((item) => item.status === "approved" && itemCoversElement(item, elementId)));
       } catch {
         setError("تعذر تحميل شواهد هذا العنصر الآن.");
       } finally {
@@ -75,159 +66,81 @@ function ElementPageInner() {
   if (!element || !guidance) {
     return (
       <AppShell title="عنصر التقييم" subtitle="الدليل الرسمي">
-        <div className="v4-empty-panel">
-          <Icon name="alert" size={28} />
-          <strong>تعذر تحديد عنصر التقييم</strong>
-          <Link href="/portfolio">العودة إلى ملفي</Link>
-        </div>
+        <div className="v4-empty-panel"><Icon name="alert" size={28} /><strong>تعذر تحديد عنصر التقييم</strong><Link href="/portfolio">العودة إلى ملفي</Link></div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="عنصر التقييم" subtitle={element.officialName}>
-      <div className="v4-breadcrumb">
-        <Link href="/portfolio">ملفي</Link>
-        <Icon name="chevron" size={14} />
-        <span>عناصر التقييم</span>
-        <Icon name="chevron" size={14} />
-        <strong>{element.officialName}</strong>
+    <AppShell>
+      <div className="exact-breadcrumb">
+        <Link href="/portfolio">ملفي</Link><Icon name="chevron" size={13} /><span>عناصر التقييم</span><Icon name="chevron" size={13} /><strong>{element.officialName}</strong>
       </div>
 
-      <section className={`v4-element-hero tone-${guidance.tone}`}>
-        <div className="v4-element-hero-visual" aria-hidden>
-          <span className="visual-sheet sheet-one" />
-          <span className="visual-sheet sheet-two" />
-          <span className="visual-bars"><i/><i/><i/></span>
-          <span className="visual-lens" />
-          <span className="visual-leaf leaf-one" />
-          <span className="visual-leaf leaf-two" />
-        </div>
-
-        <div className="v4-element-hero-copy">
-          <span className="v4-element-kind">
-            <Icon name={guidance.icon} size={17} /> عنصر التقييم
-          </span>
-          <h2>{element.officialName}</h2>
-          <div className="v4-element-chips">
-            <span><Icon name="check" size={15} /> {loading ? "…" : `${items.length} شواهد معتمدة`}</span>
-            <span><Icon name="file" size={15} /> {loading ? "…" : `${filesCount} ملفات أصلية`}</span>
+      <section className="exact-element-hero">
+        <img src="/athari-assets/hero-analytics.webp" alt="" />
+        <div className="exact-element-hero-copy">
+          <span className="exact-element-kind"><Icon name={guidance.icon} size={16} /> عنصر التقييم</span>
+          <h1>{element.officialName}</h1>
+          <div className="exact-element-meta">
             {element.weightPercent ? <span>{element.weightPercent}% من وزن التقييم</span> : null}
+            <span><Icon name="check" size={14} /> {loading ? "…" : `${items.length} شواهد معتمدة`}</span>
+            <span><Icon name="file" size={14} /> {loading ? "…" : `${filesCount} ملفات`}</span>
           </div>
         </div>
       </section>
 
-      <section className="v4-official-card">
-        <div className="v4-card-title-row">
-          <span className="v4-title-icon"><Icon name="file" size={20} /></span>
-          <div>
-            <span>من الدليل الرسمي</span>
-            <h2>تفسير العنصر</h2>
-          </div>
-        </div>
+      <section className="exact-info-card exact-explanation">
+        <div className="exact-info-title"><span><Icon name="file" size={21} /></span><div><small>من الدليل الرسمي</small><h2>تفسير العنصر</h2></div></div>
         <p>{element.description}</p>
-        <small>
-          {OFFICIAL_TEACHER_FRAMEWORK_META.sourceTitle} · {OFFICIAL_TEACHER_FRAMEWORK_META.edition} · ص {guidance.sourcePage}
-        </small>
+        <small className="exact-source">{OFFICIAL_TEACHER_FRAMEWORK_META.sourceTitle} · {OFFICIAL_TEACHER_FRAMEWORK_META.edition} · ص {guidance.sourcePage}</small>
       </section>
 
-      <section className="v4-support-card">
-        <div className="v4-card-title-row">
-          <span className="v4-title-icon lightbulb"><Icon name="idea" size={21} /></span>
-          <div>
-            <span>ممارسات واردة في تفسير العنصر</span>
-            <h2>ما الذي يدعم هذا العنصر؟</h2>
-          </div>
-        </div>
-
-        <div className="v4-support-grid">
+      <section className="exact-info-card">
+        <div className="exact-info-title"><span className="idea"><Icon name="idea" size={21} /></span><div><small>ممارسات واردة في تفسير العنصر</small><h2>ما الذي يدعم هذا العنصر؟</h2></div></div>
+        <div className="exact-support-grid">
           {guidance.supports.map((support, index) => (
-            <article className={`v4-support-item tone-${["blue", "violet", "mint"][index]}`} key={support}>
-              <span className="v4-support-number">0{index + 1}</span>
+            <article className={`support-${index + 1}`} key={support}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
               <strong>{support}</strong>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="v4-element-evidence-section">
-        <div className="v4-card-title-row">
-          <span className="v4-title-icon"><Icon name="folder" size={21} /></span>
-          <div>
-            <span>{loading ? "جاري التحميل…" : `${items.length} شواهد تغطي هذا العنصر`}</span>
-            <h2>شواهدي المعتمدة</h2>
-          </div>
-        </div>
-
+      <section className="exact-info-card">
+        <div className="exact-info-title"><span><Icon name="folder" size={21} /></span><div><small>{loading ? "جاري التحميل…" : `${items.length} شواهد تغطي هذا العنصر`}</small><h2>شواهدي المعتمدة</h2></div></div>
         {error ? <div className="flow-message is-error">{error}</div> : null}
 
-        <div className="v4-element-evidence-list">
-          {items.map((item) => {
+        <div className="exact-detail-list">
+          {items.map((item, index) => {
             const attachments = attachmentsFor(item);
-            const title = item.approvedContent?.title || item.originalFileName;
-            const description = item.approvedContent?.description || "";
-            const impact = item.approvedContent?.impact || "";
-
             return (
-              <article className="v4-detail-evidence" key={item.id}>
-                <div className="v4-detail-evidence-icon">
-                  <Icon name={guidance.icon} size={26} />
-                </div>
-                <div className="v4-detail-evidence-copy">
-                  <div className="v4-detail-evidence-head">
-                    <strong>{title}</strong>
-                    <span><Icon name="check" size={13} /> معتمد</span>
-                  </div>
-                  {description ? <p>{description}</p> : null}
-                  {impact && impact !== "لا يوجد أثر موثق متاح حاليًا." ? (
-                    <div className="v4-impact-note">
-                      <Icon name="sparkle" size={14} />
-                      <span>{impact}</span>
-                    </div>
-                  ) : null}
-                  <div className="v4-detail-evidence-footer">
+              <article className="exact-detail-evidence" key={item.id}>
+                <div className={`exact-detail-thumb thumb-${(index % 3) + 1}`} />
+                <div className="exact-detail-copy">
+                  <div><strong>{item.approvedContent?.title || item.originalFileName}</strong><span><Icon name="check" size={13} /> معتمد</span></div>
+                  {item.approvedContent?.description ? <p>{item.approvedContent.description}</p> : null}
+                  <footer>
                     <span><Icon name="file" size={14} /> {attachments.length} {attachments.length === 1 ? "ملف" : "ملفات"}</span>
                     <div>
-                      <Link className="v4-view-button" href={`/evidence/review?id=${encodeURIComponent(item.id)}`}>
-                        <Icon name="eye" size={15} /> عرض
-                      </Link>
-                      {attachments[0]?.driveWebViewLink ? (
-                        <a className="v4-attachment-button" href={attachments[0].driveWebViewLink} target="_blank" rel="noreferrer">
-                          <Icon name="paperclip" size={15} /> فتح المرفقات
-                        </a>
-                      ) : null}
+                      <Link href={`/evidence/review?id=${encodeURIComponent(item.id)}`}><Icon name="eye" size={15} /> عرض</Link>
+                      {attachments[0]?.driveWebViewLink ? <a href={attachments[0].driveWebViewLink} target="_blank" rel="noreferrer"><Icon name="paperclip" size={15} /> المرفقات</a> : null}
                     </div>
-                  </div>
+                  </footer>
                 </div>
               </article>
             );
           })}
-
-          {!loading && !error && items.length === 0 ? (
-            <div className="v4-element-empty">
-              <span><Icon name={guidance.icon} size={28} /></span>
-              <strong>لا يوجد شاهد معتمد لهذا العنصر حتى الآن</strong>
-              <p>ارفعي شاهدًا جديدًا، وسيقترح أثري تصنيفه وفق محتواه الفعلي.</p>
-            </div>
-          ) : null}
+          {!loading && !error && !items.length ? <div className="exact-empty">لا يوجد شاهد معتمد لهذا العنصر حتى الآن.</div> : null}
         </div>
       </section>
 
-      <Link className="v4-add-evidence-cta" href="/evidence/new">
-        <span><Icon name="plus" size={23} /></span>
-        <div>
-          <strong>إضافة شاهد جديد</strong>
-          <small>يمكن ربط أكثر من ملف للشاهد الواحد</small>
-        </div>
-      </Link>
+      <Link className="exact-add-evidence" href="/evidence/new"><Icon name="plus" size={21} /><span><strong>إضافة شاهد جديد</strong><small>يمكن ربط أكثر من ملف للشاهد الواحد</small></span></Link>
     </AppShell>
   );
 }
 
 export default function ElementPage() {
-  return (
-    <Suspense fallback={<div className="setup-notice">جاري تحميل عنصر التقييم…</div>}>
-      <ElementPageInner />
-    </Suspense>
-  );
+  return <Suspense fallback={<div className="setup-notice">جاري تحميل عنصر التقييم…</div>}><ElementPageInner /></Suspense>;
 }
