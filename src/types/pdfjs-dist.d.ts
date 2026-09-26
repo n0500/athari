@@ -1,1 +1,1 @@
-declare module "pdfjs-dist/webpack.mjs";
+declare module "pdfjs-dist/legacy/build/pdf.mjs";

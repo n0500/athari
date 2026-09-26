@@ -95,10 +95,15 @@ export async function analyzeEvidence(
     firstError = current;
   }
 
-  // Image-only/scanned PDFs can contain no usable text layer. Render up to
-  // three pages locally, then send only that temporary JPEG to the same
-  // Workers AI endpoint. The original PDF remains stored in the user's Drive.
-  const fallbackImage = await renderPdfForAiFallback(file);
+  let fallbackImage: File | null = null;
+
+  try {
+    fallbackImage = await renderPdfForAiFallback(file);
+  } catch (error) {
+    const current =
+      error instanceof Error ? error : new Error("PDF_VISUAL_FALLBACK_FAILED");
+    throw current;
+  }
 
   if (!fallbackImage) {
     throw firstError ?? new Error("AI_DOCUMENT_UNREADABLE");
@@ -107,7 +112,7 @@ export async function analyzeEvidence(
   const visual = await requestAnalysis(fallbackImage, framework);
 
   if (analysisIsEmpty(visual)) {
-    throw firstError ?? new Error("AI_DOCUMENT_UNREADABLE");
+    throw new Error("AI_VISUAL_ANALYSIS_EMPTY");
   }
 
   return visual;

@@ -107,13 +107,32 @@ export default function NewEvidencePage() {
         await markAnalysisFailed(evidenceId, raw).catch(() => undefined);
       }
       setIsError(true);
-      setMessage(
-        raw === "AI_FREE_LIMIT_REACHED"
-          ? "اكتملت حصة AI المجانية اليوم. الشاهد محفوظ في Drive ويمكن تحليله لاحقًا."
-          : raw === "DRIVE_RECONNECT_REQUIRED"
-          ? "انتهت جلسة Drive. اضغطي «حفظ وتحليل الشاهد» مرة أخرى لإعادة الربط تلقائيًا."
-          : "تعذر إكمال العملية الآن. إذا تم حفظ الملف في Drive فلن يضيع."
-      );
+
+      if (raw === "AI_FREE_LIMIT_REACHED") {
+        setMessage(
+          "اكتملت حصة AI المجانية اليوم. الشاهد محفوظ في Drive ويمكن تحليله لاحقًا."
+        );
+      } else if (raw === "DRIVE_RECONNECT_REQUIRED") {
+        setMessage(
+          "انتهت جلسة Drive. اضغطي «حفظ وتحليل الشاهد» مرة أخرى لإعادة الربط تلقائيًا."
+        );
+      } else if (raw.startsWith("PDF_VISUAL_FALLBACK_FAILED")) {
+        setMessage(
+          "تعذر تجهيز الـPDF المصور للتحليل على هذا الجهاز. الأصل محفوظ في Drive."
+        );
+      } else if (
+        raw === "AI_DOCUMENT_UNREADABLE" ||
+        raw === "DOCUMENT_COULD_NOT_BE_READ" ||
+        raw === "AI_VISUAL_ANALYSIS_EMPTY"
+      ) {
+        setMessage(
+          "لم يتمكن أثري من قراءة محتوى هذا الشاهد بوضوح. الأصل محفوظ في Drive."
+        );
+      } else {
+        setMessage(
+          "تعذر إكمال التحليل الآن. الأصل محفوظ في Drive، ولم يُفقد الشاهد."
+        );
+      }
     } finally {
       setBusy(false);
     }
