@@ -6,7 +6,36 @@ import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { firebaseConfigured, requireAuth } from "@/lib/firebase";
 import { listUserEvidence } from "@/lib/firestore";
-import { EvidenceRecord } from "@/types/athari";
+import {
+  ApprovedClassification,
+  EvidenceRecord,
+} from "@/types/athari";
+
+type GroupedEvidence = {
+  item: EvidenceRecord;
+  classification: ApprovedClassification;
+};
+
+function classificationsFor(item: EvidenceRecord): ApprovedClassification[] {
+  const approved = item.approvedContent;
+  if (!approved) return [];
+
+  if (approved.classifications?.length) {
+    return approved.classifications.slice(0, 3);
+  }
+
+  if (approved.elementId && approved.elementName) {
+    return [
+      {
+        elementId: approved.elementId,
+        elementName: approved.elementName,
+        isPrimary: true,
+      },
+    ];
+  }
+
+  return [];
+}
 
 export default function PortfolioPage() {
   const [items, setItems] = useState<EvidenceRecord[]>([]);
@@ -31,11 +60,35 @@ export default function PortfolioPage() {
   }, []);
 
   const grouped = useMemo(() => {
-    const map = new Map<string, EvidenceRecord[]>();
+    const map = new Map<string, GroupedEvidence[]>();
+
     for (const item of items) {
-      const key = item.approvedContent?.elementName || "غير مصنف";
-      map.set(key, [...(map.get(key) || []), item]);
+      const classifications = classificationsFor(item);
+
+      if (!classifications.length) {
+        map.set("غير مصنف", [
+          ...(map.get("غير مصنف") || []),
+          {
+            item,
+            classification: {
+              elementId: "unclassified",
+              elementName: "غير مصنف",
+              isPrimary: true,
+            },
+          },
+        ]);
+        continue;
+      }
+
+      for (const classification of classifications) {
+        const key = classification.elementName;
+        map.set(key, [
+          ...(map.get(key) || []),
+          { item, classification },
+        ]);
+      }
     }
+
     return [...map.entries()];
   }, [items]);
 
@@ -73,21 +126,42 @@ export default function PortfolioPage() {
             </div>
 
             <div className="portfolio-evidence-list">
-              {evidence.map((item) => (
-                <article className="portfolio-evidence" key={item.id}>
-                  <strong>{item.approvedContent?.title}</strong>
-                  <span>{item.originalFileName}</span>
-                  {item.driveWebViewLink ? (
-                    <a
-                      href={item.driveWebViewLink}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      فتح الأصل في Drive
-                    </a>
-                  ) : null}
-                </article>
-              ))}
+              {evidence.map(({ item, classification }) => {
+                const shared = classificationsFor(item).length > 1;
+
+                return (
+                  <article
+                    className="portfolio-evidence"
+                    key={`${item.id}-${classification.elementId}`}
+                  >
+                    <div className="portfolio-evidence-head">
+                      <strong>{item.approvedContent?.title}</strong>
+                      {shared ? (
+                        <span className="shared-badge">
+                          {classification.isPrimary
+                            ? "شاهد مشترك · أساسي"
+                            : "شاهد مشترك"}
+                        </span>
+                      ) : null}
+                    </div>
+                    <span>{item.originalFileName}</span>
+                    {classification.reason ? (
+                      <p className="classification-reason">
+                        {classification.reason}
+                      </p>
+                    ) : null}
+                    {item.driveWebViewLink ? (
+                      <a
+                        href={item.driveWebViewLink}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        فتح الأصل في Drive
+                      </a>
+                    ) : null}
+                  </article>
+                );
+              })}
             </div>
           </section>
         ))}
@@ -102,10 +176,10 @@ export default function PortfolioPage() {
       <section className="coverage-note">
         <Icon name="sparkle" size={20} />
         <div>
-          <strong>الترتيب في أثري والحفظ في Drive</strong>
+          <strong>شاهد واحد، أكثر من عنصر عند الحاجة</strong>
           <p>
-            Firestore يحتفظ بالفهرس، وGoogle Drive يحتفظ بالأصل والنسخة
-            الاحتياطية.
+            يحتفظ Google Drive بنسخة أصلية واحدة داخل مجلد التصنيف الأساسي،
+            بينما يفهرس أثري الشاهد نفسه تحت كل العناصر التي اعتمدتها.
           </p>
         </div>
       </section>

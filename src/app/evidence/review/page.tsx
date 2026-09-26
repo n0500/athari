@@ -23,6 +23,8 @@ import {
   SuggestedClassification,
 } from "@/types/athari";
 
+const MAX_CLASSIFICATIONS = 3;
+
 function ReviewInner() {
   const params = useSearchParams();
   const router = useRouter();
@@ -33,8 +35,8 @@ function ReviewInner() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const [selected, setSelected] =
-    useState<SuggestedClassification | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [primaryId, setPrimaryId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [impact, setImpact] = useState("");
@@ -49,9 +51,32 @@ function ReviewInner() {
     getEvidence(id)
       .then((record) => {
         setItem(record);
-        const suggestion =
-          record?.aiAnalysis?.suggestedClassifications?.[0] ?? null;
-        setSelected(suggestion);
+
+        const suggestions =
+          record?.aiAnalysis?.suggestedClassifications?.slice(
+            0,
+            MAX_CLASSIFICATIONS
+          ) ?? [];
+
+        const approved = record?.approvedContent?.classifications ?? [];
+        const approvedIds = approved
+          .map((entry) => entry.elementId)
+          .filter((elementId) =>
+            suggestions.some((suggestion) => suggestion.elementId === elementId)
+          )
+          .slice(0, MAX_CLASSIFICATIONS);
+
+        if (approvedIds.length) {
+          setSelectedIds(approvedIds);
+          setPrimaryId(
+            approved.find((entry) => entry.isPrimary)?.elementId ??
+              approvedIds[0]
+          );
+        } else if (suggestions[0]) {
+          setSelectedIds([suggestions[0].elementId]);
+          setPrimaryId(suggestions[0].elementId);
+        }
+
         setTitle(record?.aiAnalysis?.draftTitle ?? "");
         setDescription(record?.aiAnalysis?.draftDescription ?? "");
         setImpact(record?.aiAnalysis?.draftImpact ?? "");
@@ -60,13 +85,69 @@ function ReviewInner() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const canApprove = useMemo(
-    () => Boolean(item && selected && title.trim() && description.trim()),
-    [item, selected, title, description]
+  const suggestions = useMemo(
+    () =>
+      item?.aiAnalysis?.suggestedClassifications?.slice(
+        0,
+        MAX_CLASSIFICATIONS
+      ) ?? [],
+    [item]
   );
 
+  const selectedClassifications = useMemo(
+    () =>
+      suggestions.filter((suggestion) =>
+        selectedIds.includes(suggestion.elementId)
+      ),
+    [suggestions, selectedIds]
+  );
+
+  const canApprove = useMemo(
+    () =>
+      Boolean(
+        item &&
+          selectedClassifications.length &&
+          primaryId &&
+          title.trim() &&
+          description.trim()
+      ),
+    [item, selectedClassifications, primaryId, title, description]
+  );
+
+  function toggleClassification(suggestion: SuggestedClassification) {
+    setSelectedIds((current) => {
+      if (current.includes(suggestion.elementId)) {
+        const next = current.filter((id) => id !== suggestion.elementId);
+
+        if (primaryId === suggestion.elementId) {
+          setPrimaryId(next[0] ?? "");
+        }
+
+        return next;
+      }
+
+      if (current.length >= MAX_CLASSIFICATIONS) return current;
+
+      const next = [...current, suggestion.elementId];
+      if (!primaryId) setPrimaryId(suggestion.elementId);
+      return next;
+    });
+  }
+
   async function approve() {
-    if (!item || !selected || !canApprove) return;
+    if (!item || !selectedClassifications.length || !canApprove) return;
+
+    const primary =
+      selectedClassifications.find(
+        (suggestion) => suggestion.elementId === primaryId
+      ) ?? selectedClassifications[0];
+
+    const ordered = [
+      primary,
+      ...selectedClassifications.filter(
+        (suggestion) => suggestion.elementId !== primary.elementId
+      ),
+    ].slice(0, MAX_CLASSIFICATIONS);
 
     try {
       setSaving(true);
@@ -79,10 +160,13 @@ function ReviewInner() {
       }
 
       const token = await ensureDriveAccessToken();
+
+      // One original only: it lives in the primary Drive folder.
+      // Additional classifications are Athari index links, not duplicate files.
       const { element } = await ensureAthariElementFolder(
         token,
         item.academicYear,
-        selected.elementName
+        primary.elementName
       );
 
       if (item.driveFileId) {
@@ -95,8 +179,15 @@ function ReviewInner() {
       }
 
       const approved: ApprovedContent = {
-        elementId: selected.elementId,
-        elementName: selected.elementName,
+        // Keep primary legacy fields for old screens/records.
+        elementId: primary.elementId,
+        elementName: primary.elementName,
+        classifications: ordered.map((suggestion) => ({
+          elementId: suggestion.elementId,
+          elementName: suggestion.elementName,
+          reason: suggestion.reason,
+          isPrimary: suggestion.elementId === primary.elementId,
+        })),
         title: title.trim(),
         description: description.trim(),
         impact: impact.trim(),
@@ -106,7 +197,7 @@ function ReviewInner() {
 
       const all = await listUserEvidence(user.uid);
       await upsertAthariBackup(token, {
-        format: "athari-backup-v1",
+        format: "athari-backup-v2",
         exportedAt: new Date().toISOString(),
         evidence: all.map((e) => ({
           id: e.id,
@@ -186,29 +277,65 @@ function ReviewInner() {
         )}
       </SectionCard>
 
-      <SectionCard title="التصنيف المقترح" eyebrow="اقتراح قابل للتعديل">
-        {analysis?.suggestedClassifications?.length ? (
-          <div className="choice-list">
-            {analysis.suggestedClassifications.map((suggestion) => (
-              <button
-                key={suggestion.elementId}
-                className={`classification-choice ${
-                  selected?.elementId === suggestion.elementId
-                    ? "selected-choice"
-                    : ""
-                }`}
-                onClick={() => setSelected(suggestion)}
-              >
-                <div>
-                  <strong>{suggestion.elementName}</strong>
-                  <p>{suggestion.reason}</p>
-                </div>
-                {selected?.elementId === suggestion.elementId ? (
-                  <Icon name="check" size={20} />
-                ) : null}
-              </button>
-            ))}
-          </div>
+      <SectionCard
+        title="التصنيفات المقترحة"
+        eyebrow="اختاري حتى 3 عناصر"
+      >
+        {suggestions.length ? (
+          <>
+            <p className="classification-help">
+              التصنيف الأقوى محدد كأساسي. يمكنك إضافة تصنيفات أخرى إذا كان
+              الشاهد يدعمها، وسيبقى الأصل نسخة واحدة فقط في Drive.
+            </p>
+
+            <div className="choice-list">
+              {suggestions.map((suggestion) => {
+                const isSelected = selectedIds.includes(
+                  suggestion.elementId
+                );
+                const isPrimary =
+                  isSelected && primaryId === suggestion.elementId;
+
+                return (
+                  <div
+                    key={suggestion.elementId}
+                    className={`classification-choice ${
+                      isSelected ? "selected-choice" : ""
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="classification-main"
+                      onClick={() => toggleClassification(suggestion)}
+                    >
+                      <div>
+                        <strong>{suggestion.elementName}</strong>
+                        <p>{suggestion.reason}</p>
+                      </div>
+                      {isSelected ? <Icon name="check" size={20} /> : null}
+                    </button>
+
+                    {isSelected ? (
+                      <div className="classification-footer">
+                        <span className="classification-badge">
+                          {isPrimary ? "التصنيف الأساسي" : "شاهد مشترك"}
+                        </span>
+                        {!isPrimary ? (
+                          <button
+                            type="button"
+                            className="text-action"
+                            onClick={() => setPrimaryId(suggestion.elementId)}
+                          >
+                            اجعليه الأساسي
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </>
         ) : (
           <p className="muted-copy">
             لم يجد أثري تصنيفًا موثقًا مناسبًا لهذا الشاهد.

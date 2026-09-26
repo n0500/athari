@@ -34,9 +34,19 @@ export type AiAnalysis = {
   warnings: string[];
 };
 
-export type ApprovedContent = {
+export type ApprovedClassification = {
   elementId: string;
   elementName: string;
+  reason?: string;
+  isPrimary: boolean;
+};
+
+export type ApprovedContent = {
+  // Primary classification. Kept for backwards compatibility.
+  elementId: string;
+  elementName: string;
+  // A single evidence item may support up to three verified elements.
+  classifications?: ApprovedClassification[];
   title: string;
   description: string;
   impact: string;

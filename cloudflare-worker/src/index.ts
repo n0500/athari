@@ -151,7 +151,7 @@ function sanitizeAnalysis(
     raw.suggestedClassifications
   )
     ? raw.suggestedClassifications
-        .slice(0, 2)
+        .slice(0, 3)
         .map((item) => {
           const suggestion =
             item && typeof item === "object"
@@ -310,10 +310,13 @@ You are Athari, an evidence-grounded assistant for teachers.
 NON-NEGOTIABLE RULES:
 - Never invent results, impact, dates, counts, people, organizations, percentages, or achievements.
 - Extract only facts directly supported by the supplied evidence.
-- "support" must briefly identify where the fact came from in the evidence.
+- "support" must briefly identify where the fact came from in the evidence, using a short Arabic label whenever possible.
 - Use only performance elements in VERIFIED_FRAMEWORK.
 - If VERIFIED_FRAMEWORK is empty, suggestedClassifications must be [].
-- Use at most two classification suggestions.
+- Suggest up to THREE classification elements only when each one is directly supported by the evidence.
+- Order suggestedClassifications from strongest evidence match to weakest supported match. The first suggestion is the recommended primary classification.
+- Each classification reason must independently explain the exact evidence that supports that element.
+- Do not add a classification merely because it is thematically related; there must be direct support in the evidence.
 - draftImpact must contain only impact directly supported by evidence.
 - If no impact is documented, write exactly: "لا يوجد أثر موثق متاح حاليًا."
 - Ask at most ONE essential missing-information question.
