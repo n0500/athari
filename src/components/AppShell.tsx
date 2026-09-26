@@ -15,11 +15,14 @@ export function AppShell({
   return (
     <div className="app-frame">
       <header className="topbar">
-        <div className="brand-mark" aria-hidden>أ</div>
-        <div className="topbar-copy">
-          <strong>{title ?? "أثري"}</strong>
-          {subtitle ? <span>{subtitle}</span> : null}
+        <div className="brand-lockup">
+          <div className="brand-mark" aria-hidden>أ</div>
+          <div className="topbar-copy">
+            <strong>{title ?? "أثري"}</strong>
+            {subtitle ? <span>{subtitle}</span> : null}
+          </div>
         </div>
+        <span className="topbar-status">موثق ومحفوظ</span>
       </header>
       <main className="page-content">{children}</main>
       {showNav ? <BottomNav /> : null}

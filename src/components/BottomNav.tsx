@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Icon } from "@/components/Icon";
 
 const items = [
@@ -9,14 +12,27 @@ const items = [
 ];
 
 export function BottomNav() {
+  const pathname = usePathname();
+
   return (
     <nav className="bottom-nav" aria-label="التنقل الرئيسي">
-      {items.map((item) => (
-        <Link className="nav-item" href={item.href} key={item.href}>
-          <Icon name={item.icon} size={21} />
-          <span>{item.label}</span>
-        </Link>
-      ))}
+      {items.map((item) => {
+        const active =
+          item.href === "/"
+            ? pathname === "/"
+            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+        return (
+          <Link
+            className={`nav-item ${active ? "is-active" : ""}`}
+            href={item.href}
+            key={item.href}
+          >
+            <span className="nav-icon"><Icon name={item.icon} size={20} /></span>
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
     </nav>
   );
 }

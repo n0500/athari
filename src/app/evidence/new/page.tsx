@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
@@ -37,6 +37,11 @@ function isAccepted(file: File) {
   return /\.(pdf|jpe?g|png|webp|docx)$/i.test(file.name);
 }
 
+function formatSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function legacyAttachmentFromRecord(record: {
   originalFileName: string;
   mimeType: string;
@@ -70,6 +75,11 @@ export default function NewEvidencePage() {
   const [isError, setIsError] = useState(false);
   const academicYear =
     process.env.NEXT_PUBLIC_ATHARI_ACADEMIC_YEAR || "1448هـ";
+
+  const totalBytes = useMemo(
+    () => files.reduce((sum, file) => sum + file.size, 0),
+    [files]
+  );
 
   function chooseFiles(list: FileList | null) {
     setMessage("");
@@ -125,6 +135,12 @@ export default function NewEvidencePage() {
     setFiles(unique);
   }
 
+  function removeFile(index: number) {
+    setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setMessage("");
+    setIsError(false);
+  }
+
   async function processEvidence() {
     if (!files.length) return;
 
@@ -141,8 +157,7 @@ export default function NewEvidencePage() {
       }
 
       setMessage("يتحقق أثري من أن حزمة الشاهد غير مكررة…");
-      const { contentHash, fileHashes } =
-        await computeEvidenceBundleHash(files);
+      const { contentHash, fileHashes } = await computeEvidenceBundleHash(files);
 
       const duplicate = await findDuplicateEvidence({
         uid: user.uid,
@@ -184,9 +199,7 @@ export default function NewEvidencePage() {
       const existingAttachments = duplicate?.attachments?.length
         ? duplicate.attachments
         : duplicate && files.length === 1
-        ? [legacyAttachmentFromRecord(duplicate)].filter(
-            Boolean
-          ) as EvidenceAttachment[]
+        ? ([legacyAttachmentFromRecord(duplicate)].filter(Boolean) as EvidenceAttachment[])
         : [];
 
       const completed: EvidenceAttachment[] = [];
@@ -213,18 +226,11 @@ export default function NewEvidencePage() {
               : "نحفظ الأصل في Google Drive الخاص بك…"
           );
           driveToken = await ensureDriveAccessToken();
-          const { inbox } = await ensureAthariInbox(
-            driveToken,
-            academicYear
-          );
+          const { inbox } = await ensureAthariInbox(driveToken, academicYear);
           inboxId = inbox.id;
         }
 
-        const saved = await uploadEvidenceToDrive(
-          driveToken,
-          file,
-          inboxId
-        );
+        const saved = await uploadEvidenceToDrive(driveToken, file, inboxId);
 
         completed.push({
           originalFileName: file.name,
@@ -279,18 +285,25 @@ export default function NewEvidencePage() {
   }
 
   return (
-    <AppShell title="إضافة شاهد" subtitle="يمكن أن يتكون الشاهد من ملف واحد أو عدة ملفات">
-      <section className="upload-card">
-        <div className="upload-icon">
-          <Icon name="upload" size={30} />
+    <AppShell title="إضافة شاهد" subtitle="ملف واحد أو حزمة ملفات">
+      <section className="upload-stage">
+        <div className="flow-steps" aria-label="مراحل إضافة الشاهد">
+          <span className="is-current"><b>1</b> اختيار</span>
+          <span><b>2</b> تحليل</span>
+          <span><b>3</b> مراجعة</span>
         </div>
-        <h1>ارفعي ملفات الشاهد</h1>
-        <p>
-          صورة واحدة أو عدة صور وملفات متنوعة؛ أثري يجمعها في سجل واحد
-          ويحللها معًا كشاهد واحد.
-        </p>
 
-        <label className="upload-picker">
+        <div className="upload-intro">
+          <span className="upload-hero-icon"><Icon name="upload" size={28} /></span>
+          <span className="eyebrow">شاهد جديد</span>
+          <h1>ارفعي كل ما يخص الإنجاز دفعة واحدة</h1>
+          <p>
+            صور، PDF أو Word. إذا كانت عدة ملفات لنفس الإنجاز، أثري يجمعها
+            ويقرأها كشاهد واحد.
+          </p>
+        </div>
+
+        <label className="premium-upload-picker">
           <input
             type="file"
             multiple
@@ -298,64 +311,66 @@ export default function NewEvidencePage() {
             onChange={(event) => chooseFiles(event.target.files)}
             disabled={busy}
           />
-          <span>
-            {files.length
-              ? files.length === 1
-                ? files[0].name
-                : `${files.length} ملفات مختارة`
-              : "اختيار صور أو ملفات"}
-          </span>
+          <span className="picker-icon"><Icon name="plus" size={22} /></span>
+          <div>
+            <strong>{files.length ? "تغيير الملفات المختارة" : "اختيار صور أو ملفات"}</strong>
+            <small>حتى 8 ملفات · 10 MB لكل ملف</small>
+          </div>
         </label>
 
         {files.length ? (
-          <div
-            style={{
-              display: "grid",
-              gap: 7,
-              marginTop: 12,
-              textAlign: "right",
-            }}
-          >
-            {files.map((file, index) => (
-              <div
-                key={`${file.name}-${file.size}-${file.lastModified}`}
-                style={{
-                  padding: "9px 11px",
-                  border: "1px solid #e3e8e4",
-                  borderRadius: 12,
-                  background: "#f8faf8",
-                  fontSize: 12,
-                }}
-              >
-                {index + 1}. {file.name}
+          <section className="selected-files-card">
+            <div className="selected-files-head">
+              <div>
+                <strong>{files.length === 1 ? "ملف واحد" : `${files.length} ملفات`}</strong>
+                <span>{formatSize(totalBytes)} إجمالي</span>
               </div>
-            ))}
-          </div>
-        ) : null}
+              <span className="selected-badge">شاهد واحد</span>
+            </div>
 
-        {files.length ? (
-          <button
-            className="primary-button full-button process-button"
-            onClick={processEvidence}
-            disabled={busy}
-            style={{ marginTop: 12 }}
-          >
-            <Icon name="sparkle" size={20} />
-            {busy ? "جاري الحفظ والتحليل…" : "حفظ وتحليل الشاهد"}
-          </button>
+            <div className="selected-files-list">
+              {files.map((file, index) => (
+                <div className="selected-file" key={`${file.name}-${file.size}-${file.lastModified}`}>
+                  <span className="file-type-icon"><Icon name="file" size={18} /></span>
+                  <div>
+                    <strong>{file.name}</strong>
+                    <span>{formatSize(file.size)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-button danger-soft"
+                    onClick={() => removeFile(index)}
+                    disabled={busy}
+                    aria-label={`حذف ${file.name}`}
+                  >
+                    <Icon name="trash" size={17} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
         ) : null}
 
         {message ? (
           <div className={`flow-message ${isError ? "is-error" : ""}`}>
+            {busy ? <span className="busy-dot" /> : null}
             {message}
           </div>
         ) : null}
 
-        <div className="privacy-row">
-          <Icon name="check" size={18} />
+        <button
+          className="primary-button full-button large-cta"
+          onClick={processEvidence}
+          disabled={!files.length || busy}
+        >
+          <Icon name="sparkle" size={20} />
+          {busy ? "جاري الحفظ والتحليل…" : "حفظ وتحليل الشاهد"}
+        </button>
+
+        <div className="privacy-strip">
+          <Icon name="shield" size={18} />
           <span>
-            حتى 8 ملفات، 10 MB للملف و30 MB للحزمة كاملة. التكرار يُمنع
-            تلقائيًا.
+            الأصل يبقى في Google Drive لديك، وأثري يمنع تكرار نفس الحزمة تلقائيًا.
           </span>
         </div>
       </section>

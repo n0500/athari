@@ -9,7 +9,18 @@ type IconName =
   | "check"
   | "alert"
   | "folder"
-  | "edit";
+  | "edit"
+  | "eye"
+  | "share"
+  | "external"
+  | "copy"
+  | "archive"
+  | "trash"
+  | "link"
+  | "shield"
+  | "grid"
+  | "clock"
+  | "print";
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const common = {
@@ -47,5 +58,27 @@ export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
       return <svg {...common}><path d="M3 6h6l2 2h10v11H3z"/></svg>;
     case "edit":
       return <svg {...common}><path d="m4 20 4.5-1L19 8.5 15.5 5 5 15.5z"/><path d="m13.8 6.7 3.5 3.5"/></svg>;
+    case "eye":
+      return <svg {...common}><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>;
+    case "share":
+      return <svg {...common}><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>;
+    case "external":
+      return <svg {...common}><path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M19 13v6H5V5h6"/></svg>;
+    case "copy":
+      return <svg {...common}><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>;
+    case "archive":
+      return <svg {...common}><path d="M4 7h16v13H4z"/><path d="M3 4h18v3H3z"/><path d="M9 11h6"/></svg>;
+    case "trash":
+      return <svg {...common}><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m7 7 1 13h8l1-13"/></svg>;
+    case "link":
+      return <svg {...common}><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"/></svg>;
+    case "shield":
+      return <svg {...common}><path d="M12 3 5 6v5c0 4.4 2.8 8 7 10 4.2-2 7-5.6 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>;
+    case "grid":
+      return <svg {...common}><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>;
+    case "clock":
+      return <svg {...common}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>;
+    case "print":
+      return <svg {...common}><path d="M7 8V4h10v4"/><path d="M7 17H5a2 2 0 0 1-2-2v-5h18v5a2 2 0 0 1-2 2h-2"/><path d="M7 14h10v6H7z"/></svg>;
   }
 }

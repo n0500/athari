@@ -37,6 +37,23 @@ service cloud.firestore {
         resource.data.ownerUid == request.auth.uid;
     }
 
+    match /publicShares/{shareId} {
+      allow get: if resource.data.active == true ||
+        (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow list: if false;
+
+      allow create: if signedIn() &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.active == true;
+
+      allow update: if signedIn() &&
+        resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
+
+      allow delete: if signedIn() &&
+        resource.data.ownerUid == request.auth.uid;
+    }
+
     match /frameworks/{frameworkId} {
       allow read: if signedIn();
       allow write: if false;

@@ -1,4 +1,5 @@
 import { clearStoredDriveToken } from "@/lib/auth";
+import type { ShareDrivePermission } from "@/lib/portfolioShare";
 
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3";
@@ -93,11 +94,7 @@ export async function ensureAthariInbox(
 ) {
   const root = await ensureFolder(token, "أثري", "root");
   const year = await ensureFolder(token, academicYear, root.id);
-  const inbox = await ensureFolder(
-    token,
-    "00 - قيد المراجعة",
-    year.id
-  );
+  const inbox = await ensureFolder(token, "00 - قيد المراجعة", year.id);
   return { root, year, inbox };
 }
 
@@ -155,9 +152,7 @@ async function getDriveFile(
 ): Promise<DriveFile> {
   return driveJson<DriveFile>(
     token,
-    `${DRIVE_API}/files/${encodeURIComponent(
-      fileId
-    )}?fields=id,name,parents,webViewLink`
+    `${DRIVE_API}/files/${encodeURIComponent(fileId)}?fields=id,name,parents,webViewLink`
   );
 }
 
@@ -167,15 +162,10 @@ export async function moveDriveFile(
   _fromParentId: string | undefined,
   toParentId: string
 ) {
-  // Read the real current parents first. This makes approval retry-safe:
-  // if a previous attempt already moved the file, we do not try to remove
-  // a stale parent again.
   const current = await getDriveFile(token, fileId);
   const currentParents = current.parents ?? [];
 
-  if (currentParents.includes(toParentId)) {
-    return current;
-  }
+  if (currentParents.includes(toParentId)) return current;
 
   const params = new URLSearchParams({
     addParents: toParentId,
@@ -191,6 +181,100 @@ export async function moveDriveFile(
     `${DRIVE_API}/files/${encodeURIComponent(fileId)}?${params}`,
     { method: "PATCH" }
   );
+}
+
+async function listPermissions(token: string, fileId: string) {
+  return driveJson<{
+    permissions: Array<{ id: string; type: string; role: string }>;
+  }>(
+    token,
+    `${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions?fields=permissions(id,type,role)`
+  );
+}
+
+async function createAnyoneReader(token: string, fileId: string) {
+  return driveJson<{ id: string }>(
+    token,
+    `${DRIVE_API}/files/${encodeURIComponent(fileId)}/permissions?fields=id`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "anyone",
+        role: "reader",
+        allowFileDiscovery: false,
+      }),
+    }
+  );
+}
+
+export async function publishPortfolioFiles(
+  token: string,
+  fileIds: string[],
+  previous: ShareDrivePermission[] = []
+) {
+  const uniqueIds = [...new Set(fileIds.filter(Boolean))];
+  const published: ShareDrivePermission[] = [];
+
+  for (const driveFileId of uniqueIds) {
+    const current = await listPermissions(token, driveFileId);
+    const anyoneReader = current.permissions.find(
+      (permission) =>
+        permission.type === "anyone" && permission.role === "reader"
+    );
+
+    if (anyoneReader) {
+      const prior = previous.find(
+        (entry) =>
+          entry.driveFileId === driveFileId &&
+          entry.permissionId === anyoneReader.id
+      );
+
+      published.push({
+        driveFileId,
+        permissionId: anyoneReader.id,
+        createdByAthari: prior?.createdByAthari ?? false,
+      });
+      continue;
+    }
+
+    const created = await createAnyoneReader(token, driveFileId);
+    published.push({
+      driveFileId,
+      permissionId: created.id,
+      createdByAthari: true,
+    });
+  }
+
+  return published;
+}
+
+export async function revokePortfolioPermissions(
+  token: string,
+  permissions: ShareDrivePermission[]
+) {
+  for (const permission of permissions) {
+    if (!permission.createdByAthari) continue;
+
+    const response = await fetch(
+      `${DRIVE_API}/files/${encodeURIComponent(
+        permission.driveFileId
+      )}/permissions/${encodeURIComponent(permission.permissionId)}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (response.status === 401) {
+      clearStoredDriveToken();
+      throw new Error("DRIVE_RECONNECT_REQUIRED");
+    }
+
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`DRIVE_ERROR_${response.status}`);
+    }
+  }
 }
 
 async function findBackup(token: string) {
