@@ -12,6 +12,20 @@ import { requireAuth } from "@/lib/firebase";
 import { listUserEvidence } from "@/lib/firestore";
 import type { EvidenceAttachment, EvidenceRecord } from "@/types/athari";
 
+const ELEMENT_ART: Record<string, string> = {
+  "teacher-duty-performance": "/athari-assets/element-duty.webp",
+  "professional-community-engagement": "/athari-assets/element-community.webp",
+  "parent-engagement": "/athari-assets/element-parent.webp",
+  "teaching-strategies-variety": "/athari-assets/element-strategies.webp",
+  "learner-results-improvement": "/athari-assets/element-improve.webp",
+  "learning-plan": "/athari-assets/element-plan.webp",
+  "learning-technology": "/athari-assets/element-tech.webp",
+  "learning-environment": "/athari-assets/element-environment.webp",
+  "classroom-management": "/athari-assets/element-classroom.webp",
+  "learner-results-analysis": "/athari-assets/element-analysis.webp",
+  "assessment-methods-variety": "/athari-assets/element-assessment.webp",
+};
+
 function itemCoversElement(item: EvidenceRecord, elementId: string) {
   const approved = item.approvedContent;
   if (!approved) return false;
@@ -77,8 +91,8 @@ function ElementPageInner() {
         <Link href="/portfolio">ملفي</Link><Icon name="chevron" size={13} /><span>عناصر التقييم</span><Icon name="chevron" size={13} /><strong>{element.officialName}</strong>
       </div>
 
-      <section className="exact-element-hero">
-        <img src="/athari-assets/hero-analytics.webp" alt="" />
+      <section className={`exact-element-hero tone-${guidance.tone}`}>
+        <img src={ELEMENT_ART[element.id] ?? "/athari-analytics-premium.svg"} alt="" />
         <div className="exact-element-hero-copy">
           <span className="exact-element-kind"><Icon name={guidance.icon} size={16} /> عنصر التقييم</span>
           <h1>{element.officialName}</h1>
