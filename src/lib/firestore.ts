@@ -63,6 +63,56 @@ export async function computeEvidenceBundleHash(files: File[]) {
   return { contentHash, fileHashes };
 }
 
+/** A unique id for an attachment, kept across retries of the same upload. */
+export function newAttachmentId() {
+  const bytes = new Uint8Array(9);
+  crypto.getRandomValues(bytes);
+  return `att_${Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
+ * Pairs each selected file with the attachment already recorded for it
+ * (same name + size + content hash). Each recorded attachment is used at
+ * most once, so two files with identical content are never mixed up.
+ */
+export function matchPriorAttachments(
+  files: File[],
+  fileHashes: string[],
+  prior: EvidenceAttachment[]
+) {
+  const used = new Set<number>();
+  return files.map((file, index) => {
+    const hash = fileHashes[index];
+    const found = prior.findIndex(
+      (attachment, priorIndex) =>
+        !used.has(priorIndex) &&
+        attachment.originalFileName === file.name &&
+        attachment.fileSize === file.size &&
+        (attachment.contentHash ? attachment.contentHash === hash : true)
+    );
+    if (found < 0) return undefined;
+    used.add(found);
+    return prior[found];
+  });
+}
+
+/**
+ * Saves upload progress right after each file reaches Drive, so a retry
+ * after an interruption reuses the files already uploaded instead of
+ * uploading them again. The status stays unchanged until the whole bundle
+ * is attached.
+ */
+export async function saveAttachmentProgress(
+  evidenceId: string,
+  attachments: EvidenceAttachment[]
+) {
+  await updateDoc(doc(requireDb(), "evidence", evidenceId), {
+    attachments,
+    fileCount: attachments.length,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function createEvidenceDraft(input: {
   ownerUid: string;
   academicYear: string;
@@ -77,6 +127,7 @@ export async function createEvidenceDraft(input: {
   if (!first) throw new Error("FILE_REQUIRED");
 
   const attachments: EvidenceAttachment[] = files.map((file, index) => ({
+    attachmentId: newAttachmentId(),
     originalFileName: file.name,
     mimeType: file.type || "application/octet-stream",
     fileSize: file.size,

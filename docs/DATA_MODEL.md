@@ -6,6 +6,7 @@ displayName, email, role, updatedAt
 ## evidence/{evidenceId}
 ownerUid, academicYear, status
 originalFileName, mimeType, fileSize
+attachments[]: attachmentId, originalFileName, mimeType, fileSize, contentHash, driveFileId, driveWebViewLink, driveParentFolderId
 driveFileId, driveWebViewLink, driveParentFolderId
 aiAnalysis
 approvedContent

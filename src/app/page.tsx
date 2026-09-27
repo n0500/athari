@@ -3,8 +3,19 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { AppShell } from "@/components/AppShell";
-import { Icon } from "@/components/Icon";
+import {
+  ActionTile,
+  AthShell,
+  CoverageRing,
+  EvidenceThumb,
+  EvidenceTiles,
+  Glyph,
+  MiniStats,
+  Notice,
+  PageHero,
+  SectionHead,
+  StatusTag,
+} from "@/components/athari-ui/Ui";
 import { firebaseConfigured, requireAuth } from "@/lib/firebase";
 import { listUserEvidence } from "@/lib/firestore";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
@@ -75,163 +86,94 @@ export default function HomePage() {
     : 0;
 
   const recent = approved.slice(0, 2);
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    if (!firebaseConfigured) return;
+    return onAuthStateChanged(requireAuth(), (user) => {
+      setName(user?.displayName?.trim().split(/\s+/)[0] ?? "");
+    });
+  }, []);
+
+  function primaryOf(item: EvidenceRecord) {
+    const approvedContent = item.approvedContent;
+    const primary =
+      approvedContent?.classifications?.find((entry) => entry.isPrimary) ??
+      approvedContent?.classifications?.[0];
+    return {
+      elementId: primary?.elementId ?? approvedContent?.elementId,
+      elementName: primary?.elementName ?? approvedContent?.elementName,
+    };
+  }
 
   return (
-    <AppShell title="أثري" subtitle="ملف الأداء الذكي">
-      <section className="home-hero">
-        <div className="home-hero-copy">
-          <span className="eyebrow light">ملفك المهني الآن</span>
-          <h1>كل شاهد في مكانه، وكل عنصر واضح.</h1>
-          <p>
-            أثري يجمع الأصول، يقرأ الشاهد، ويرتب ملف الأداء بدون تكرار أو
-            فوضى.
-          </p>
-          <div className="hero-actions-row">
-            <Link className="button-on-dark" href="/evidence/new">
-              <Icon name="plus" size={19} />
-              إضافة شاهد
-            </Link>
-            <Link className="button-ghost-dark" href="/preview">
-              <Icon name="eye" size={18} />
-              معاينة الملف
-            </Link>
-          </div>
-        </div>
+    <AthShell title="ملف الأداء المهني" subtitle="ملخص الشواهد وتغطية عناصر التقييم.">
+      <PageHero
+        title="تغطية عناصر التقييم"
+        sub={loading ? "…" : `${approved.length} ${approved.length === 1 ? "شاهد معتمد" : "شواهد معتمدة"} · ${covered.size} من ${totalElements} عناصر مغطاة`}
+        side={<CoverageRing percent={coverage} loading={loading} />}
+        actions={
+          <>
+            <Link className="ath-btn primary" href="/evidence/new"><Glyph name="plus" />إضافة شاهد</Link>
+            <Link className="ath-btn white" href="/preview"><Glyph name="eye" />معاينة ملف الأداء</Link>
+          </>
+        }
+      />
 
-        <div className="coverage-dial" aria-label={`تغطية ${coverage}%`}>
-          <div
-            className="coverage-ring"
-            style={{
-              background: `conic-gradient(#ffffff ${coverage * 3.6}deg, rgba(255,255,255,.18) 0deg)`,
-            }}
-          >
-            <div className="coverage-ring-core">
-              <strong>{loading ? "…" : `${coverage}%`}</strong>
-              <span>تغطية الإطار</span>
-            </div>
-          </div>
-          <small>
-            {loading ? "…" : `${covered.size} من ${totalElements} عناصر`}
-          </small>
-        </div>
-      </section>
+      <MiniStats
+        stats={[
+          { value: loading ? "…" : approved.length, label: "شواهد معتمدة", tone: "s2", icon: "doc" },
+          { value: loading ? "…" : `${covered.size} من ${totalElements}`, label: "عناصر مغطاة", tone: "s3", icon: "folder" },
+          { value: loading ? "…" : attention.length, label: "تحتاج مراجعة", tone: "s4", icon: "clock" },
+        ]}
+      />
 
-      <section className="metric-grid">
-        <article className="metric-card">
-          <div className="metric-icon"><Icon name="check" size={19} /></div>
-          <div>
-            <strong>{loading ? "…" : approved.length}</strong>
-            <span>شواهد معتمدة</span>
-          </div>
-        </article>
-        <article className="metric-card">
-          <div className="metric-icon"><Icon name="grid" size={19} /></div>
-          <div>
-            <strong>{loading ? "…" : covered.size}</strong>
-            <span>عناصر مغطاة</span>
-          </div>
-        </article>
-        <article className="metric-card attention">
-          <div className="metric-icon"><Icon name="clock" size={19} /></div>
-          <div>
-            <strong>{loading ? "…" : attention.length}</strong>
-            <span>تحتاج مراجعة</span>
-          </div>
-        </article>
-      </section>
+      {error ? <Notice tone="error">{error}</Notice> : null}
 
-      {error ? <div className="flow-message is-error">{error}</div> : null}
+      <SectionHead icon={<Glyph name="sparkle" className="ath-green-ico" />} title="اختصارات" />
+      <div className="ath-tile-grid">
+        <ActionTile href="/evidence/new" title="إضافة شاهد" sub="ملف أو أكثر" elementArt="planner" tone="sky" />
+        <ActionTile href="/preview" title="معاينة ملف الأداء" sub="قبل الطباعة أو المشاركة" elementArt="report" tone="lav" />
+        <ActionTile href="/portfolio" title="ملف الأداء" sub="عناصر التقييم والشواهد" elementArt="clipboard" tone="mint" />
+      </div>
 
-      <section className="page-section">
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">اختصارات</span>
-            <h2>وصلي لما تحتاجينه بسرعة</h2>
-          </div>
-        </div>
-
-        <div className="quick-grid">
-          <Link href="/evidence/new" className="quick-card primary-quick">
-            <span className="quick-icon"><Icon name="upload" size={21} /></span>
-            <strong>إضافة شاهد</strong>
-            <small>ملف واحد أو عدة ملفات</small>
-          </Link>
-          <Link href="/preview" className="quick-card">
-            <span className="quick-icon"><Icon name="eye" size={21} /></span>
-            <strong>معاينة الملف</strong>
-            <small>شاهدي ما ستعرضينه</small>
-          </Link>
-          <Link href="/portfolio" className="quick-card">
-            <span className="quick-icon"><Icon name="folder" size={21} /></span>
-            <strong>ملف الأداء</strong>
-            <small>العناصر والشواهد</small>
-          </Link>
-        </div>
-      </section>
-
-      <section className="page-section">
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">المتابعة</span>
-            <h2>{attention.length ? "يحتاج انتباهك" : "الوضع مستقر"}</h2>
-          </div>
-          <Link href="/evidence" className="text-link">عرض الشواهد</Link>
-        </div>
-
-        {attention.length ? (
-          <div className="stack">
-            {attention.slice(0, 3).map((item) => (
-              <Link
-                href={`/evidence/review?id=${encodeURIComponent(item.id)}`}
-                className="evidence-card compact"
-                key={item.id}
-              >
-                <div className="evidence-card-head">
-                  <span className="status-pill status-needs-info">
-                    {item.status === "analysis_failed"
-                      ? "تعذر التحليل"
-                      : item.status === "needs_info"
-                      ? "يحتاج معلومة"
-                      : "جاهز للمراجعة"}
-                  </span>
-                  <Icon name="chevron" size={18} />
+      <SectionHead
+        icon={<Glyph name="clock" className="ath-amber-ico" />}
+        title={attention.length ? "شواهد تحتاج مراجعة" : "لا توجد شواهد تحتاج مراجعة"}
+        side={<Link className="ath-link-btn" href="/evidence">عرض الشواهد <Glyph name="chevLeft" size={14} /></Link>}
+      />
+      {attention.length ? (
+        <div className="ath-list">
+          {attention.slice(0, 3).map((item) => {
+            const suggestion = item.aiAnalysis?.suggestedClassifications?.[0];
+            return (
+              <Link className="ath-item" href={`/evidence/review?id=${encodeURIComponent(item.id)}`} key={item.id}>
+                <div className="bd">
+                  <div className="head"><StatusTag status={item.status} /><Glyph name="chevLeft" size={14} /></div>
+                  <h3>{item.aiAnalysis?.draftTitle || item.originalFileName}</h3>
+                  {suggestion ? <p className="meta">التصنيف المقترح: {suggestion.elementName}</p> : null}
                 </div>
-                <h3>{item.aiAnalysis?.draftTitle || item.originalFileName}</h3>
+                <div className="th"><EvidenceThumb elementId={suggestion?.elementId} /></div>
               </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="success-empty">
-            <span className="success-check"><Icon name="check" size={22} /></span>
-            <div>
-              <strong>لا توجد شواهد معلقة</strong>
-              <p>كل ما رفعتيه حاليًا إما معتمد أو لا يحتاج إجراء منك.</p>
-            </div>
-          </div>
-        )}
-      </section>
+            );
+          })}
+        </div>
+      ) : null}
 
       {recent.length ? (
-        <section className="page-section">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">آخر ما اعتمدتِ</span>
-              <h2>شواهد حديثة</h2>
-            </div>
-          </div>
-          <div className="stack">
-            {recent.map((item) => (
-              <article className="recent-card" key={item.id}>
-                <span className="recent-dot" />
-                <div>
-                  <strong>{item.approvedContent?.title || item.originalFileName}</strong>
-                  <p>{item.approvedContent?.elementName}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+        <>
+          <SectionHead icon={<Glyph name="doc" className="ath-green-ico" />} title="آخر الشواهد المعتمدة" />
+          <EvidenceTiles
+            items={recent.map((item) => ({
+              id: item.id,
+              title: item.approvedContent?.title || item.originalFileName,
+              description: item.approvedContent?.description || "",
+              ...primaryOf(item),
+              view: { href: `/evidence/review?id=${encodeURIComponent(item.id)}` },
+            }))}
+          />
+        </>
       ) : null}
-    </AppShell>
+    </AthShell>
   );
 }

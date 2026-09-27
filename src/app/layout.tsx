@@ -1,19 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { AthariMotion } from "@/components/AthariMotion";
 import "./globals.css";
 import "./athari-v2.css";
 import "./athari-v4.css";
 import "./share-v5.css";
 import "./athari-final.css";
 import "./athari-premium.css";
-import "./athari-exact.css";
-import "./athari-polish-v2.css";
-import "./athari-motion.css";
-import "./athari-assets-fix.css";
+import "./athari-mockup.css";
+import "./athari-v7.css";
 
 export const metadata: Metadata = {
-  title: "أثري | ملف الأداء الذكي",
-  description: "منصة ذكية لتنظيم شواهد الأداء المهني للمعلمة.",
+  title: "أثري | ملف الأداء المهني",
+  description: "تنظيم شواهد الأداء المهني للمعلمة وفق عناصر التقييم الرسمية.",
 };
 
 export const viewport: Viewport = {
@@ -28,10 +25,15 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ar" dir="rtl">
-      <body>
-        {children}
-        <AthariMotion />
-      </body>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap"
+        />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }

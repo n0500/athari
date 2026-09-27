@@ -215,38 +215,63 @@ export async function publishPortfolioFiles(
 ) {
   const uniqueIds = [...new Set(fileIds.filter(Boolean))];
   const published: ShareDrivePermission[] = [];
+  const createdNow: ShareDrivePermission[] = [];
 
-  for (const driveFileId of uniqueIds) {
-    const current = await listPermissions(token, driveFileId);
-    const anyoneReader = current.permissions.find(
-      (permission) =>
-        permission.type === "anyone" && permission.role === "reader"
-    );
-
-    if (anyoneReader) {
-      const prior = previous.find(
-        (entry) =>
-          entry.driveFileId === driveFileId &&
-          entry.permissionId === anyoneReader.id
+  try {
+    for (const driveFileId of uniqueIds) {
+      const current = await listPermissions(token, driveFileId);
+      const anyoneReader = current.permissions.find(
+        (permission) =>
+          permission.type === "anyone" && permission.role === "reader"
       );
 
-      published.push({
-        driveFileId,
-        permissionId: anyoneReader.id,
-        createdByAthari: prior?.createdByAthari ?? false,
-      });
-      continue;
-    }
+      if (anyoneReader) {
+        const prior = previous.find(
+          (entry) =>
+            entry.driveFileId === driveFileId &&
+            entry.permissionId === anyoneReader.id
+        );
 
-    const created = await createAnyoneReader(token, driveFileId);
-    published.push({
-      driveFileId,
-      permissionId: created.id,
-      createdByAthari: true,
-    });
+        published.push({
+          driveFileId,
+          permissionId: anyoneReader.id,
+          createdByAthari: prior?.createdByAthari ?? false,
+        });
+        continue;
+      }
+
+      const created = await createAnyoneReader(token, driveFileId);
+      const entry: ShareDrivePermission = {
+        driveFileId,
+        permissionId: created.id,
+        createdByAthari: true,
+      };
+      published.push(entry);
+      createdNow.push(entry);
+    }
+  } catch (error) {
+    // Undo the permissions this call added before failing, then report the failure.
+    await revokePortfolioPermissions(token, createdNow).catch(() => undefined);
+    throw error;
   }
 
   return published;
+}
+
+/** Permissions in `published` that were not part of the previous share. */
+export function newlyAddedPermissions(
+  published: ShareDrivePermission[],
+  previous: ShareDrivePermission[]
+) {
+  return published.filter(
+    (entry) =>
+      entry.createdByAthari &&
+      !previous.some(
+        (prior) =>
+          prior.driveFileId === entry.driveFileId &&
+          prior.permissionId === entry.permissionId
+      )
+  );
 }
 
 export async function revokePortfolioPermissions(

@@ -3,8 +3,17 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { AppShell } from "@/components/AppShell";
-import { Icon } from "@/components/Icon";
+import {
+  AthShell,
+  EvidenceThumb,
+  Glyph,
+  Notice,
+  StatusTag,
+  Tabs,
+} from "@/components/athari-ui/Ui";
+import { Scene } from "@/components/athari-ui/Art";
+import { InfoTip } from "@/components/InfoTip";
+import { SHARE_SYNC_PENDING_MESSAGE, syncShareWithApproved } from "@/lib/shareSync";
 import { firebaseConfigured, requireAuth } from "@/lib/firebase";
 import {
   archiveEvidence,
@@ -28,20 +37,10 @@ function classificationNames(item: EvidenceRecord) {
   );
 }
 
-function statusLabel(item: EvidenceRecord) {
-  if (item.status === "approved") return "معتمد";
-  if (item.status === "needs_info") return "يحتاج معلومة";
-  if (item.status === "ready_for_review") return "جاهز للمراجعة";
-  if (item.status === "analysis_failed") return "تعذر التحليل";
-  if (item.status === "analyzing") return "قيد التحليل";
-  if (item.status === "uploaded") return "تم الحفظ";
-  return "قيد المتابعة";
-}
-
 function fileSummary(item: EvidenceRecord) {
   const count = item.attachments?.length || item.fileCount || 1;
   if (count <= 1) return item.originalFileName;
-  return `${count} ملفات أصلية`;
+  return count === 2 ? "ملفان أصليان" : count <= 10 ? `${count} ملفات أصلية` : `${count} ملفًا أصليًا`;
 }
 
 export default function EvidencePage() {
@@ -49,6 +48,7 @@ export default function EvidencePage() {
   const [loading, setLoading] = useState(firebaseConfigured);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [notice, setNotice] = useState("");
 
   async function refresh(uid: string) {
     setItems(await listUserEvidence(uid));
@@ -92,17 +92,31 @@ export default function EvidencePage() {
     ["needs_info", "ready_for_review", "analysis_failed"].includes(item.status)
   ).length;
 
+  // Keep an active «مشاركة ملف الأداء» in step after a record leaves the file.
+  async function afterRemoval(uid: string) {
+    try {
+      const result = await syncShareWithApproved(uid);
+      if (result === "revoke_pending") setNotice(SHARE_SYNC_PENDING_MESSAGE);
+    } catch {
+      setNotice("تعذر تحديث مشاركة ملف الأداء الآن. حدّثيها من صفحة ملف الأداء.");
+    }
+  }
+
   async function archive(item: EvidenceRecord) {
     if (
       !window.confirm(
-        `أرشفة «${item.approvedContent?.title || item.originalFileName}» وإخفائه من القوائم؟`
+        `أرشفة «${item.approvedContent?.title || item.originalFileName}»؟ يختفي الشاهد من الملف النشط ويمكن الرجوع إليه لاحقًا.`
       )
     ) return;
 
     try {
+      setNotice("");
       await archiveEvidence(item.id);
       const user = requireAuth().currentUser;
-      if (user) await refresh(user.uid);
+      if (user) {
+        await refresh(user.uid);
+        if (item.status === "approved") await afterRemoval(user.uid);
+      }
     } catch {
       setError("تعذرت أرشفة الشاهد الآن.");
     }
@@ -111,110 +125,96 @@ export default function EvidencePage() {
   async function remove(item: EvidenceRecord) {
     const confirmation = `حذف سجل «${
       item.approvedContent?.title || item.originalFileName
-    }» من أثري؟\n\nلن تُحذف الملفات الأصلية من Google Drive.`;
+    }» من أثري؟\n\nلا تُحذف الملفات الأصلية من Google Drive.`;
 
     if (!window.confirm(confirmation)) return;
 
     try {
+      setNotice("");
       await deleteEvidenceRecord(item.id);
       const user = requireAuth().currentUser;
-      if (user) await refresh(user.uid);
+      if (user) {
+        await refresh(user.uid);
+        if (item.status === "approved") await afterRemoval(user.uid);
+      }
     } catch {
       setError("تعذر حذف سجل الشاهد الآن.");
     }
   }
 
-  return (
-    <AppShell title="الشواهد" subtitle="كل الشواهد في مكان واحد">
-      <section className="evidence-overview">
-        <div>
-          <span className="eyebrow light">الفهرس الذكي</span>
-          <h1>راجعي، اعتمدي، أو ارجعي لأي شاهد.</h1>
-        </div>
-        <Link className="button-on-dark" href="/evidence/new">
-          <Icon name="plus" size={19} />
-          إضافة شاهد
-        </Link>
-      </section>
+  function elementIdOf(item: EvidenceRecord) {
+    const approved = item.approvedContent;
+    return (
+      approved?.classifications?.find((entry) => entry.isPrimary)?.elementId ??
+      approved?.elementId ??
+      item.aiAnalysis?.suggestedClassifications?.[0]?.elementId
+    );
+  }
 
-      <div className="segment-control modern-segments">
-        <button className={`segment ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>
-          الكل <b>{items.length}</b>
-        </button>
-        <button className={`segment ${filter === "approved" ? "active" : ""}`} onClick={() => setFilter("approved")}>
-          معتمد <b>{approvedCount}</b>
-        </button>
-        <button className={`segment ${filter === "attention" ? "active" : ""}`} onClick={() => setFilter("attention")}>
-          يحتاج متابعة <b>{attentionCount}</b>
-        </button>
+  return (
+    <AthShell title="الشواهد" subtitle="استعراض الشواهد وإدارتها.">
+      <div className="ath-actions">
+        <Link className="ath-btn primary fit" href="/evidence/new"><Glyph name="plus" />إضافة شاهد</Link>
       </div>
 
-      {error ? <div className="flow-message is-error">{error}</div> : null}
-      {loading ? <div className="setup-notice">جاري تحميل الشواهد…</div> : null}
+      <Tabs<Filter>
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { value: "all", label: "الكل", count: items.length },
+          { value: "approved", label: "معتمد", count: approvedCount },
+          { value: "attention", label: "يحتاج متابعة", count: attentionCount },
+        ]}
+      />
 
-      <div className="stack evidence-stack">
+      {error ? <Notice tone="error">{error}</Notice> : null}
+      {notice ? <Notice>{notice}</Notice> : null}
+      {loading ? <Notice>جاري تحميل الشواهد…</Notice> : null}
+
+      <div className="ath-list">
         {filtered.map((item) => {
           const names = classificationNames(item);
-          const isApproved = item.status === "approved";
-
+          const href = `/evidence/review?id=${encodeURIComponent(item.id)}`;
           return (
-            <article className="evidence-card premium-evidence" key={item.id}>
-              <Link href={`/evidence/review?id=${encodeURIComponent(item.id)}`} className="evidence-main-link">
-                <div className="evidence-card-head">
-                  <span
-                    className={`status-pill ${
-                      isApproved
-                        ? "status-approved"
-                        : item.status === "needs_info" || item.status === "analysis_failed"
-                        ? "status-needs-info"
-                        : "status-ready"
-                    }`}
-                  >
-                    {statusLabel(item)}
-                  </span>
-                  <span className="muted-small">{item.academicYear}</span>
+            <article className="ath-item" key={item.id}>
+              <div className="bd">
+                <div className="head">
+                  <StatusTag status={item.status} />
+                  <span className="meta">{item.academicYear}</span>
                 </div>
-
-                <h3>
-                  {item.approvedContent?.title ||
-                    item.aiAnalysis?.draftTitle ||
-                    item.originalFileName}
-                </h3>
-
-                <p className="classification-line">
-                  {names.length ? names.join(" · ") : "لم يعتمد التصنيف بعد"}
-                </p>
-
-                <div className="evidence-footer-row">
-                  <span><Icon name="file" size={15} /> {fileSummary(item)}</span>
-                  <span className="open-hint">فتح <Icon name="chevron" size={15} /></span>
+                <Link href={href}>
+                  <h3>{item.approvedContent?.title || item.aiAnalysis?.draftTitle || item.originalFileName}</h3>
+                </Link>
+                <p className="meta">{names.length ? names.join(" · ") : "لم يُعتمد التصنيف بعد"}</p>
+                <div className="ft">
+                  <span className="files"><Glyph name="docOutline" size={14} />{fileSummary(item)}</span>
+                  <div className="acts">
+                    <Link className="ath-mini blue" href={href}>فتح<Glyph name="chevLeft" size={12} /></Link>
+                    <span className="v7-inline">
+                      <button type="button" className="ath-mini" onClick={() => archive(item)}>
+                        <Glyph name="archive" size={15} />أرشفة
+                      </button>
+                      <InfoTip text="يختفي الشاهد من الملف النشط ويمكن الرجوع إليه لاحقًا." />
+                    </span>
+                    <button type="button" className="ath-mini danger" onClick={() => remove(item)} aria-label="حذف من أثري">
+                      <Glyph name="trash" size={15} />حذف
+                    </button>
+                  </div>
                 </div>
-              </Link>
-
-              <div className="evidence-actions-row">
-                <button type="button" className="quiet-action" onClick={() => archive(item)}>
-                  <Icon name="archive" size={16} /> أرشفة
-                </button>
-                <button type="button" className="quiet-action danger" onClick={() => remove(item)}>
-                  <Icon name="trash" size={16} /> حذف من أثري
-                </button>
               </div>
+              <Link className="th" href={href} tabIndex={-1} aria-hidden><EvidenceThumb elementId={elementIdOf(item)} /></Link>
             </article>
           );
         })}
 
         {!loading && !error && filtered.length === 0 ? (
-          <div className="empty-state polished-empty">
-            <span><Icon name="file" size={26} /></span>
+          <div className="ath-panel ath-scene-card">
+            <Scene kind="empty" />
             <strong>{filter === "all" ? "لا توجد شواهد نشطة" : "لا توجد شواهد في هذا القسم"}</strong>
-            <p>ابدئي بإضافة شاهد، وسيظهر هنا تلقائيًا بعد الحفظ.</p>
           </div>
         ) : null}
       </div>
 
-      <Link className="floating-add" href="/evidence/new" aria-label="إضافة شاهد">
-        <Icon name="plus" size={25} />
-      </Link>
-    </AppShell>
+    </AthShell>
   );
 }

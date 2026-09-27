@@ -148,3 +148,60 @@ export async function getPublicPortfolioShare(token: string) {
   const share = normalizeShare(snap.id, snap.data());
   return share?.active ? share : null;
 }
+
+/**
+ * Removes from the active share any evidence that is no longer approved
+ * (archived or deleted). The share is saved first; the caller then revokes
+ * the returned Drive permissions and confirms with `forgetPermissions`.
+ * Permissions stay listed on the share until revoked, so a failed revoke
+ * can be retried by updating the share.
+ */
+export async function pruneActiveShare(uid: string, approvedIds: Set<string>) {
+  const share = await getActivePortfolioShare(uid);
+  if (!share) return { shareId: "", changed: false, dropped: [] as ShareDrivePermission[] };
+
+  const evidence = share.evidence.filter((item) => approvedIds.has(item.id));
+  if (evidence.length === share.evidence.length) {
+    return { shareId: share.id, changed: false, dropped: [] as ShareDrivePermission[] };
+  }
+
+  const stillUsed = new Set(
+    evidence.flatMap((item) =>
+      item.attachments
+        .map((attachment) => attachment.driveFileId)
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
+  await updateDoc(doc(requireDb(), "publicShares", share.id), {
+    evidence,
+    updatedAt: serverTimestamp(),
+  });
+
+  return {
+    shareId: share.id,
+    changed: true,
+    dropped: share.drivePermissions.filter(
+      (permission) => !stillUsed.has(permission.driveFileId)
+    ),
+  };
+}
+
+/** Removes revoked permissions from the share record. */
+export async function forgetPermissions(
+  shareId: string,
+  revoked: ShareDrivePermission[]
+) {
+  if (!shareId || !revoked.length) return;
+  const snap = await getDoc(doc(requireDb(), "publicShares", shareId));
+  if (!snap.exists()) return;
+  const current = normalizeShare(snap.id, snap.data());
+  if (!current) return;
+  const gone = new Set(revoked.map((entry) => `${entry.driveFileId}|${entry.permissionId}`));
+  await updateDoc(doc(requireDb(), "publicShares", shareId), {
+    drivePermissions: current.drivePermissions.filter(
+      (entry) => !gone.has(`${entry.driveFileId}|${entry.permissionId}`)
+    ),
+    updatedAt: serverTimestamp(),
+  });
+}

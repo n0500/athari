@@ -33,7 +33,8 @@ type IconName =
   | "analytics"
   | "checklist"
   | "paperclip"
-  | "back";
+  | "back"
+  | "bars";
 
 export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const common = {
@@ -83,6 +84,7 @@ export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
     case "classroom": return <svg {...common}><path d="M3 5h18v10H3z"/><path d="M7 19h10M12 15v4"/><circle cx="8" cy="10" r="1.3"/><path d="M11 12c.8-2 3-3 5-2"/></svg>;
     case "analytics": return <svg {...common}><path d="M4 19V9M9 19V5M14 19v-7M19 19V3"/><circle cx="15.5" cy="8.5" r="5"/><path d="m19 12 3 3"/></svg>;
     case "checklist": return <svg {...common}><rect x="5" y="3" width="14" height="18" rx="2"/><path d="m8 8 1 1 2-2M13 8h3M8 13l1 1 2-2M13 13h3M8 18h8"/></svg>;
+    case "bars": return <svg {...common}><rect x="4" y="11" width="4" height="9" rx="1.2" fill="currentColor" stroke="none"/><rect x="10" y="5" width="4" height="15" rx="1.2" fill="currentColor" stroke="none"/><rect x="16" y="9" width="4" height="11" rx="1.2" fill="currentColor" stroke="none"/></svg>;
     case "paperclip": return <svg {...common}><path d="m9 12 6-6a3 3 0 1 1 4 4l-8 8a5 5 0 0 1-7-7l8-8"/></svg>;
   }
 }

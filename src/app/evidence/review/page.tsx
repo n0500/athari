@@ -2,9 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AppShell } from "@/components/AppShell";
-import { SectionCard } from "@/components/SectionCard";
-import { Icon } from "@/components/Icon";
+import { AthShell, ElementArt, Glyph, Notice, Panel } from "@/components/athari-ui/Ui";
+import { InfoTip } from "@/components/InfoTip";
 import { requireAuth } from "@/lib/firebase";
 import { ensureDriveAccessToken } from "@/lib/auth";
 import {
@@ -256,13 +255,13 @@ function ReviewInner() {
         // Approval is already committed; backup can be refreshed later.
       }
 
-      router.push("/portfolio");
+      router.push("/portfolio?added=1");
     } catch (caught) {
       const raw = caught instanceof Error ? caught.message : "UNKNOWN";
 
       if (raw === "DRIVE_RECONNECT_REQUIRED") {
         setError(
-          "انتهت جلسة Drive. اضغطي «اعتماد وترتيب في Drive» مرة أخرى لإعادة الربط تلقائيًا."
+          "انتهت جلسة Google Drive. اضغطي «اعتماد الشاهد» مرة أخرى لإعادة الربط."
         );
       } else if (stage === "drive") {
         setError(
@@ -280,21 +279,21 @@ function ReviewInner() {
     }
   }
 
+  const back = { href: "/evidence" };
+
   if (loading) {
     return (
-      <AppShell title="مراجعة الشاهد">
-        <div className="setup-notice">جاري تحميل التحليل…</div>
-      </AppShell>
+      <AthShell back={back}>
+        <Notice><span className="ath-busy" />جاري تحميل التحليل…</Notice>
+      </AthShell>
     );
   }
 
   if (!item) {
     return (
-      <AppShell title="مراجعة الشاهد">
-        <div className="setup-notice">
-          {error || "الشاهد غير موجود."}
-        </div>
-      </AppShell>
+      <AthShell back={back}>
+        <Notice tone="error">{error || "الشاهد غير موجود."}</Notice>
+      </AthShell>
     );
   }
 
@@ -302,197 +301,137 @@ function ReviewInner() {
   const originals = attachmentsFor(item);
 
   return (
-    <AppShell title="مراجعة الشاهد" subtitle="القرار النهائي لك">
-      <section className="section-card" style={{ marginTop: 0 }}>
-        <span className="eyebrow">الأصول في Google Drive</span>
-        <h2>
-          {originals.length === 1
-            ? "ملف واحد لهذا الشاهد"
-            : `${originals.length} ملفات لهذا الشاهد`}
-        </h2>
-        <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+    <AthShell back={back} title="مراجعة الشاهد" subtitle="مراجعة البيانات والتصنيف قبل الاعتماد.">
+
+      <div className="ath-steps" aria-label="مراحل إضافة الشاهد">
+        <span className="on"><b>1</b>اختيار</span>
+        <span className="on"><b>2</b>تحليل</span>
+        <span className="on"><b>3</b>مراجعة</span>
+      </div>
+
+      <Panel
+        icon={<Glyph name="folder" size={22} />}
+        title={originals.length === 1 ? "ملف واحد لهذا الشاهد" : originals.length === 2 ? "ملفان لهذا الشاهد" : `${originals.length} ملفات لهذا الشاهد`}
+        sub="الأصول محفوظة في Google Drive"
+      >
+        <div className="ath-stack">
           {originals.map((attachment, index) => (
-            <div
-              key={`${attachment.originalFileName}-${index}`}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr auto",
-                gap: 10,
-                alignItems: "center",
-                padding: "10px 11px",
-                border: "1px solid #e5ebe6",
-                borderRadius: 12,
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <strong
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {attachment.originalFileName}
-                </strong>
-              </div>
+            <div className="ath-file-row" key={`${attachment.originalFileName}-${index}`}>
+              <span className="ic"><Glyph name="docOutline" size={18} /></span>
+              <div className="nm"><strong>{attachment.originalFileName}</strong></div>
               {attachment.driveWebViewLink ? (
-                <a
-                  className="mini-button"
-                  href={attachment.driveWebViewLink}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  فتح
+                <a className="ath-icon-btn blue" href={attachment.driveWebViewLink} target="_blank" rel="noreferrer" aria-label={`فتح ${attachment.originalFileName}`}>
+                  <Glyph name="external" size={17} />
                 </a>
               ) : null}
             </div>
           ))}
         </div>
-      </section>
+      </Panel>
 
-      <SectionCard title="ما فهمه أثري من الشاهد" eyebrow="حقائق فقط">
+      <Panel icon={<Glyph name="sparkle" size={22} />} title="ما فهمه أثري من الشاهد" sub="من محتوى الشاهد">
         {analysis?.extractedFacts?.length ? (
-          <ul className="facts-list">
+          <ul className="ath-facts">
             {analysis.extractedFacts.map((fact, index) => (
               <li key={index}>
-                {fact.fact}
-                {fact.support ? <small> — {fact.support}</small> : null}
+                <Glyph name="check" size={16} />
+                <span>
+                  {fact.fact}
+                  {fact.support ? <small>{fact.support}</small> : null}
+                </span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="muted-copy">لم تُستخرج حقائق بعد.</p>
+          <p className="ath-fine" style={{ marginTop: 10 }}>لم تُستخرج حقائق بعد.</p>
         )}
-
         {analysis?.warnings?.length ? (
-          <div className="flow-message" style={{ marginTop: 12 }}>
-            {analysis.warnings.join(" ")}
-          </div>
+          <div style={{ marginTop: 10 }}><Notice>{analysis.warnings.join(" ")}</Notice></div>
         ) : null}
-      </SectionCard>
+      </Panel>
 
-      <SectionCard title="التصنيفات المقترحة" eyebrow="اختاري حتى 3 عناصر">
+      <Panel icon={<Glyph name="bars" size={22} />} iconTone="blue" title="التصنيفات المقترحة" sub={`حتى ${MAX_CLASSIFICATIONS} عناصر`}>
         {suggestions.length ? (
-          <>
-            <p className="classification-help">
-              التصنيف الأقوى محدد كأساسي. يمكنك إضافة تصنيفات أخرى إذا
-              كان الشاهد يدعمها، وستنتقل جميع ملفات الشاهد إلى مجلد التصنيف
-              الأساسي دون تكرارها.
+          <div className="ath-stack">
+            <p className="ath-fine">
+              التصنيف الأساسي يحدد مجلد الشاهد، ويمكن إضافة تصنيفات مشتركة.
             </p>
-
-            <div className="choice-list">
-              {suggestions.map((suggestion) => {
-                const isSelected = selectedIds.includes(
-                  suggestion.elementId
-                );
-                const isPrimary =
-                  isSelected && primaryId === suggestion.elementId;
-
-                return (
-                  <div
-                    key={suggestion.elementId}
-                    className={`classification-choice ${
-                      isSelected ? "selected-choice" : ""
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      className="classification-main"
-                      onClick={() => toggleClassification(suggestion)}
-                    >
-                      <div>
-                        <strong>{suggestion.elementName}</strong>
-                        <p>{suggestion.reason}</p>
-                      </div>
-                      {isSelected ? <Icon name="check" size={20} /> : null}
-                    </button>
-
-                    {isSelected ? (
-                      <div className="classification-footer">
-                        <span className="classification-badge">
-                          {isPrimary ? "التصنيف الأساسي" : "شاهد مشترك"}
-                        </span>
-                        {!isPrimary ? (
-                          <button
-                            type="button"
-                            className="text-action"
-                            onClick={() =>
-                              setPrimaryId(suggestion.elementId)
-                            }
-                          >
-                            اجعليه الأساسي
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          </>
+            {suggestions.map((suggestion) => {
+              const isSelected = selectedIds.includes(suggestion.elementId);
+              const isPrimary = isSelected && primaryId === suggestion.elementId;
+              return (
+                <div key={suggestion.elementId} className={`ath-choice ${isSelected ? "sel" : ""}`}>
+                  <button type="button" className="main" onClick={() => toggleClassification(suggestion)} aria-pressed={isSelected}>
+                    <ElementArt elementId={suggestion.elementId} className="art" />
+                    <span className="tx">
+                      <strong>{suggestion.elementName}</strong>
+                      <p>{suggestion.reason}</p>
+                    </span>
+                    <Glyph name={isSelected ? "check" : "empty"} size={24} />
+                  </button>
+                  {isSelected ? (
+                    <div className="foot">
+                      <span className={`badge ${isPrimary ? "" : "alt"}`}>{isPrimary ? "التصنيف الأساسي" : "شاهد مشترك"}</span>
+                      {!isPrimary ? (
+                        <button type="button" className="ath-text-btn" onClick={() => setPrimaryId(suggestion.elementId)}>
+                          اجعليه الأساسي
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         ) : (
-          <p className="muted-copy">
-            لم يجد أثري تصنيفًا موثقًا مناسبًا لهذا الشاهد.
-          </p>
+          <p className="ath-fine" style={{ marginTop: 10 }}>لم يجد أثري تصنيفًا موثقًا مناسبًا لهذا الشاهد.</p>
         )}
-      </SectionCard>
+      </Panel>
 
-      <SectionCard title="الصياغة المقترحة" eyebrow="عدلي قبل الاعتماد">
-        <label className="field-label">عنوان الشاهد</label>
-        <input
-          className="text-input"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-        />
-
-        <label className="field-label">وصف التنفيذ</label>
-        <textarea
-          className="text-area"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-        />
-
-        <label className="field-label">الأثر المدعوم</label>
-        <textarea
-          className="text-area"
-          value={impact}
-          onChange={(event) => setImpact(event.target.value)}
-        />
-      </SectionCard>
+      <Panel icon={<Glyph name="docOutline" size={22} />} title="الصياغة المقترحة" sub="قابلة للتعديل">
+        <div className="ath-field">
+          <label htmlFor="ev-title">عنوان الشاهد</label>
+          <input id="ev-title" value={title} onChange={(event) => setTitle(event.target.value)} />
+        </div>
+        <div className="ath-field">
+          <label htmlFor="ev-desc">وصف التنفيذ</label>
+          <textarea id="ev-desc" value={description} onChange={(event) => setDescription(event.target.value)} />
+        </div>
+        <div className="ath-field">
+          <label htmlFor="ev-impact">الأثر المدعوم</label>
+          <textarea id="ev-impact" value={impact} onChange={(event) => setImpact(event.target.value)} />
+        </div>
+      </Panel>
 
       {analysis?.missingInformation ? (
-        <section className="question-card">
-          <div className="question-icon">
-            <Icon name="alert" size={22} />
-          </div>
+        <section className="ath-question">
+          <span className="ic"><Glyph name="alert" size={20} /></span>
           <div>
-            <span className="eyebrow">معلومة تحتاج تأكيدك</span>
+            <small>معلومة تحتاج تأكيدك</small>
             <h2>{analysis.missingInformation.question}</h2>
           </div>
         </section>
       ) : null}
 
-      {error ? <div className="flow-message is-error">{error}</div> : null}
+      {error ? <Notice tone="error">{error}</Notice> : null}
 
-      <div className="review-actions">
-        <button
-          className="primary-button full-button"
-          onClick={approve}
-          disabled={!canApprove || saving}
-        >
-          <Icon name="check" size={20} />
-          {saving ? "جاري الاعتماد…" : "اعتماد وترتيب في Drive"}
+      <div className="ath-sticky">
+        <div className="v7-field-head">
+          <strong>الاعتماد</strong>
+          <InfoTip text="بعد الاعتماد يدخل الشاهد في ملف الأداء." />
+        </div>
+        <button type="button" className="ath-btn primary block" onClick={approve} disabled={!canApprove || saving}>
+          <Glyph name="check" />
+          {saving ? "جاري الاعتماد…" : "اعتماد الشاهد"}
         </button>
       </div>
-    </AppShell>
+    </AthShell>
   );
 }
 
 export default function EvidenceReviewPage() {
   return (
-    <Suspense fallback={<div className="setup-notice">جاري التحميل…</div>}>
+    <Suspense fallback={<div className="ath"><div className="ath-frame"><div className="ath-notice">جاري التحميل…</div></div></div>}>
       <ReviewInner />
     </Suspense>
   );

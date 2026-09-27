@@ -20,7 +20,7 @@ export default async function LegacyEvidencePage({
           استخدمي شاشة المراجعة الجديدة المرتبطة بـ Firestore وGoogle Drive.
         </p>
         <Link
-          className="primary-button full-button"
+          className="ath-btn primary block"
           href={`/evidence/review?id=${encodeURIComponent(id)}`}
         >
           فتح المراجعة الجديدة

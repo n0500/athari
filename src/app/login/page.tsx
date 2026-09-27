@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/Icon";
+import { Glyph, Notice } from "@/components/athari-ui/Ui";
+import { HeroArt } from "@/components/athari-ui/Art";
 import { firebaseConfigured } from "@/lib/firebase";
 import { signInWithGoogleAndDrive } from "@/lib/auth";
 import { ensureUserProfile } from "@/lib/firestore";
@@ -31,41 +32,39 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="auth-page">
-      <div className="auth-card">
-        <div className="brand-large">أ</div>
-        <span className="eyebrow">أثري</span>
-        <h1>شواهدك عندك، وترتيبها عند أثري</h1>
-        <p>
-          سجلي بحساب Google. أثري يطلب صلاحية محدودة للملفات
-          التي ينشئها داخل Drive فقط.
-        </p>
-
-        {firebaseConfigured ? (
-          <button
-            className="primary-button full-button"
-            onClick={login}
-            disabled={loading}
-          >
-            {loading ? "جاري الربط…" : "الدخول وربط Google Drive"}
-            <Icon name="chevron" size={18} />
-          </button>
-        ) : (
-          <div className="setup-notice">
-            الواجهة جاهزة. يلزم فقط إدخال إعدادات Firebase لتفعيل الدخول.
+    <div className="ath">
+      <main className="ath-auth">
+        <div className="ath-auth-card">
+          <div className="ath-brand">
+            <svg viewBox="0 0 48 40" width="48" height="40" aria-hidden>
+              <path d="M4 4l18 6v28L4 32z" fill="#2f7df2" />
+              <path d="M26 10l18-6v28l-18 6z" fill="#f6a53c" />
+              <path d="M22 10h4v28h-4z" fill="#1b4fb8" />
+            </svg>
+            أثري
           </div>
-        )}
+          <div className="ath-auth-art"><HeroArt kind="folders" /></div>
+          <h1>ملف الأداء المهني</h1>
+          <p>
+            تسجيل الدخول بحساب Google. يصل أثري إلى الملفات التي ينشئها في
+            Google Drive فقط.
+          </p>
 
-        {error ? <p className="error-text">{error}</p> : null}
+          {firebaseConfigured ? (
+            <button type="button" className="ath-btn primary block" onClick={login} disabled={loading}>
+              {loading ? "جاري تسجيل الدخول…" : "تسجيل الدخول بحساب Google"}
+              <Glyph name="chevLeft" size={18} />
+            </button>
+          ) : (
+            <Notice>تسجيل الدخول غير مفعّل: إعدادات Firebase غير مكتملة.</Notice>
+          )}
 
-        <Link href="/" className="secondary-button full-button auth-preview">
-          معاينة الواجهة
-        </Link>
+          {error ? <Notice tone="error">{error}</Notice> : null}
 
-        <p className="auth-note">
-          لا يطلب أثري صلاحية الاطلاع على كامل Google Drive.
-        </p>
-      </div>
-    </main>
+          <Link href="/" className="ath-btn outline block">معاينة الواجهة</Link>
+
+        </div>
+      </main>
+    </div>
   );
 }

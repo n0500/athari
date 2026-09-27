@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { AppShell } from "@/components/AppShell";
-import { Icon } from "@/components/Icon";
+import { AthShell, ElementArt, Glyph, Notice } from "@/components/athari-ui/Ui";
+import { SHARE_SYNC_PENDING_MESSAGE, syncShareWithApproved } from "@/lib/shareSync";
+import { HeroWave } from "@/components/athari-ui/Art";
 import { getStoredDriveToken, logout } from "@/lib/auth";
 import { requireAuth } from "@/lib/firebase";
 import { cleanupDuplicateEvidence } from "@/lib/firestore";
+import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 
 type PanelKey =
   | "profile"
@@ -30,6 +32,7 @@ export default function AccountPage() {
   }, []);
 
   const year = process.env.NEXT_PUBLIC_ATHARI_ACADEMIC_YEAR || "1448هـ";
+  const elementCount = OFFICIAL_TEACHER_FRAMEWORK_V2.length;
   const displayName = user?.displayName?.trim() || "حساب المعلمة";
   const email = user?.email || "لم يظهر البريد";
   const initial = useMemo(
@@ -54,14 +57,19 @@ export default function AccountPage() {
       setBusy(true);
       setCleanupMessage("جاري فحص المحاولات المكررة…");
       const result = await cleanupDuplicateEvidence(user.uid);
+      let shareNote = "";
+      if (result.archivedCount) {
+        const sync = await syncShareWithApproved(user.uid).catch(() => "revoke_pending" as const);
+        if (sync === "revoke_pending") shareNote = ` ${SHARE_SYNC_PENDING_MESSAGE}`;
+      }
       setCleanupMessage(
         result.archivedCount
-          ? `تمت أرشفة ${result.archivedCount} محاولة مكررة. الملفات الأصلية في Drive لم تُحذف.`
-          : "لا توجد محاولات مكررة تحتاج تنظيفًا الآن."
+          ? `أُرشفت ${result.archivedCount} محاولة مكررة، ولم يُحذف أي ملف من Google Drive.${shareNote}`
+          : "لا توجد محاولات مكررة."
       );
     } catch {
       setCleanupMessage(
-        "تعذر إكمال التنظيف الآن. لم يتم حذف أي ملف من Drive."
+        "تعذر إكمال التنظيف الآن، ولم يُحذف أي ملف من Google Drive."
       );
     } finally {
       setBusy(false);
@@ -82,103 +90,90 @@ export default function AccountPage() {
     key: Exclude<PanelKey, null>;
     title: string;
     subtitle: string;
-    icon: "user" | "grid" | "shield" | "archive" | "sparkle";
+    art: string;
+    tone: "lav" | "sky" | "cream" | "pink" | "mint";
   }> = [
-    { key: "profile", title: "بيانات الملف المهني", subtitle: "الحساب المتصل", icon: "user" },
-    { key: "framework", title: "السنة وإطار الأداء", subtitle: `${year} · 11 عنصرًا`, icon: "grid" },
-    { key: "privacy", title: "الخصوصية والمشاركة", subtitle: "Google Drive وروابط العرض", icon: "shield" },
-    { key: "maintenance", title: "تنظيف المحاولات المكررة", subtitle: "أرشفة آمنة دون حذف الأصول", icon: "archive" },
-    { key: "help", title: "المساعدة", subtitle: "المسار المختصر لاستخدام أثري", icon: "sparkle" },
+    { key: "profile", title: "بيانات الملف المهني", subtitle: "الحساب المتصل", art: "people", tone: "lav" },
+    { key: "framework", title: "السنة وإطار الأداء", subtitle: `${year} · ${elementCount} عنصرًا`, art: "planner", tone: "sky" },
+    { key: "privacy", title: "الخصوصية والمشاركة", subtitle: "حالة Google Drive والمشاركة", art: "clipboard", tone: "mint" },
+    { key: "maintenance", title: "تنظيف المحاولات المكررة", subtitle: "أرشفة آمنة دون حذف الأصول", art: "report", tone: "pink" },
+    { key: "help", title: "المساعدة", subtitle: "المسار المختصر لاستخدام أثري", art: "bulb", tone: "cream" },
   ];
 
   return (
-    <AppShell title="الحساب" subtitle="إعداداتك وبيانات ملفك">
-      <section className="account-hero">
-        <div className="avatar premium-avatar">{initial}</div>
-        <div>
-          <span className="eyebrow light">الحساب المتصل</span>
-          <h1>{displayName}</h1>
-          <p>{email}</p>
+    <AthShell title="الحساب" subtitle="إدارة الحساب وخيارات المشاركة.">
+      <section className="ath-hero">
+        <div className="ath-profile">
+          <span className="av">{initial}</span>
+          <div className="ath-hero-text">
+            <span className="ath-pill-out"><Glyph name="check" size={16} />الحساب متصل</span>
+            <h1 style={{ marginTop: 6 }}>{displayName}</h1>
+            <p>{email}</p>
+          </div>
         </div>
-        <span className="account-badge">
-          <Icon name="check" size={15} /> متصل
-        </span>
+        <HeroWave />
       </section>
 
-      <div className="settings-list modern-settings">
+      <div className="ath-settings">
         {panels.map((entry) => (
-          <div className="settings-item" key={entry.key}>
-            <button type="button" onClick={() => toggle(entry.key)}>
-              <span className="settings-row-icon"><Icon name={entry.icon} size={19} /></span>
-              <span className="settings-row-copy">
+          <div className={`ath-set ${panel === entry.key ? "open" : ""}`} key={entry.key}>
+            <button type="button" onClick={() => toggle(entry.key)} aria-expanded={panel === entry.key}>
+              <span className={`ic tone-${entry.tone}`}><ElementArt art={entry.art} /></span>
+              <span className="tx">
                 <strong>{entry.title}</strong>
                 <small>{entry.subtitle}</small>
               </span>
-              <Icon name="chevron" size={18} />
+              <Glyph name="chevLeft" size={16} className="chev" />
             </button>
 
             {panel === entry.key ? (
-              <div className="settings-panel">
+              <div className="body">
                 {entry.key === "profile" ? (
                   <>
                     <strong>حساب Google المستخدم في أثري</strong>
-                    <p>{displayName}</p>
-                    <p>{email}</p>
+                    <span>{displayName}</span>
+                    <span dir="ltr" style={{ textAlign: "right" }}>{email}</span>
                   </>
                 ) : null}
 
                 {entry.key === "framework" ? (
                   <>
                     <strong>العام الدراسي {year}</strong>
-                    <p>
-                      أثري يصنف الشواهد على إطار تقييم أداء المعلم الرسمي المكوّن من 11 عنصرًا.
-                    </p>
-                    <Link className="text-link" href="/preview">معاينة تغطية العناصر</Link>
+                    <span>تُصنَّف الشواهد وفق إطار تقييم أداء المعلم الرسمي ({elementCount} عنصرًا).</span>
+                    <Link className="ath-link" href="/preview">معاينة ملف الأداء</Link>
                   </>
                 ) : null}
 
                 {entry.key === "privacy" ? (
                   <>
-                    <strong>الأصول تبقى في Google Drive</strong>
-                    <p>
-                      رابط المديرة يُنشأ عند طلبك فقط، ويقتصر على الشواهد المعتمدة داخل مجلد مشاركة منفصل.
-                    </p>
+                    <strong>الملفات الأصلية في Google Drive الخاص بك</strong>
+                    <span>يعرض رابط المشاركة الشواهد المعتمدة فقط دون الوصول إلى بقية ملفاتك.</span>
                     <small>
-                      جلسة Drive: {getStoredDriveToken()
-                        ? "مرتبطة الآن"
-                        : "ستطلب إعادة الربط عند الحاجة"}
+                      حالة Google Drive: {getStoredDriveToken() ? "متصل" : "يُطلب الربط عند الحاجة"}
                     </small>
-                    <Link className="text-link" href="/portfolio">إدارة المشاركة من ملفي</Link>
+                    <Link className="ath-link" href="/portfolio?share=1">إدارة مشاركة ملف الأداء</Link>
                   </>
                 ) : null}
 
                 {entry.key === "maintenance" ? (
                   <>
                     <strong>تنظيف آمن</strong>
-                    <p>
-                      يحتفظ أثري بأفضل سجل للشاهد الواحد، ويؤرشف المحاولات الأقدم دون حذف الملفات الأصلية.
-                    </p>
-                    <button
-                      type="button"
-                      className="secondary-button full-button"
-                      onClick={cleanDuplicates}
-                      disabled={busy}
-                    >
-                      <Icon name="archive" size={17} />
+                    <span>يحتفظ أثري بأفضل سجل للشاهد الواحد، ويؤرشف المحاولات الأقدم دون حذف الملفات الأصلية.</span>
+                    <button type="button" className="ath-btn outline" onClick={cleanDuplicates} disabled={busy}>
+                      <Glyph name="archive" size={17} />
                       {busy ? "جاري التنظيف…" : "تنظيف الآن"}
                     </button>
-                    {cleanupMessage ? <p className="settings-result">{cleanupMessage}</p> : null}
+                    {cleanupMessage ? <Notice>{cleanupMessage}</Notice> : null}
                   </>
                 ) : null}
 
                 {entry.key === "help" ? (
                   <>
-                    <strong>أربع خطوات فقط</strong>
-                    <ol className="help-steps">
-                      <li>ارفعي ملفًا أو عدة ملفات لنفس الشاهد.</li>
-                      <li>راجعي ما فهمه أثري والتصنيفات المقترحة.</li>
-                      <li>اعتمدي الشاهد والتصنيف الأساسي.</li>
-                      <li>عايني ملفك أو أنشئي رابط مشاركة للمديرة.</li>
+                    <ol>
+                      <li>أضيفي ملفًا أو أكثر للشاهد نفسه.</li>
+                      <li>راجعي البيانات والتصنيف المقترح.</li>
+                      <li>اعتمدي الشاهد.</li>
+                      <li>عايني ملف الأداء أو شاركيه.</li>
                     </ol>
                   </>
                 ) : null}
@@ -188,21 +183,16 @@ export default function AccountPage() {
         ))}
       </div>
 
-      <div className="legal-links">
+      <button type="button" className="ath-btn danger block" onClick={signOutNow} disabled={busy}>
+        <Glyph name="logout" />
+        {busy ? "جاري التنفيذ…" : "تسجيل الخروج"}
+      </button>
+
+      <div className="ath-legal">
         <Link href="/privacy">سياسة الخصوصية</Link>
         <span>·</span>
         <Link href="/terms">شروط الاستخدام</Link>
       </div>
-
-      <button
-        type="button"
-        className="secondary-button full-button signout-button"
-        onClick={signOutNow}
-        disabled={busy}
-      >
-        <Icon name="user" size={18} />
-        {busy ? "جاري التنفيذ…" : "تسجيل الخروج"}
-      </button>
-    </AppShell>
+    </AthShell>
   );
 }

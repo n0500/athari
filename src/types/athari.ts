@@ -41,6 +41,8 @@ export type ApprovedContent = {
 };
 
 export type EvidenceAttachment = {
+  /** Stable id for this attachment inside its evidence record. */
+  attachmentId?: string;
   originalFileName: string;
   mimeType: string;
   fileSize: number;

@@ -6,8 +6,8 @@ import { Icon } from "@/components/Icon";
 
 const items = [
   { href: "/", label: "الرئيسية", icon: "home" as const },
-  { href: "/portfolio", label: "ملفي", icon: "folder" as const },
-  { href: "/evidence", label: "الشواهد", icon: "file" as const },
+  { href: "/portfolio", label: "ملف الأداء", icon: "folder" as const },
+  { href: "/evidence", label: "الشواهد", icon: "bars" as const },
   { href: "/account", label: "الحساب", icon: "user" as const },
 ];
 
