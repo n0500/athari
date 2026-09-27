@@ -17,6 +17,7 @@ type Analysis = {
     elementId: string;
     elementName: string;
     reason: string;
+    requirementIds?: string[];
   }>;
   draftTitle: string;
   draftDescription: string;
@@ -24,6 +25,13 @@ type Analysis = {
   missingInformation: null | { question: string; reason: string };
   warnings: string[];
   unreadableFiles?: string[];
+};
+
+type WorkerFrameworkElement = {
+  id: string;
+  officialName: string;
+  description?: string;
+  requirements?: Array<{ id: string; label: string }>;
 };
 
 function cors(origin: string) {
@@ -113,11 +121,7 @@ function asString(value: unknown) {
 
 function sanitizeAnalysis(
   value: unknown,
-  framework: Array<{
-    id: string;
-    officialName: string;
-    description?: string;
-  }>
+  framework: WorkerFrameworkElement[]
 ): Analysis {
   if (!value || typeof value !== "object") {
     throw new Error("AI_INVALID_OUTPUT");
@@ -163,10 +167,21 @@ function sanitizeAnalysis(
 
           if (!verified) return null;
 
+          const allowedRequirementIds = new Set(
+            (verified.requirements ?? []).map((requirement) => requirement.id)
+          );
+          const requirementIds = Array.isArray(suggestion.requirementIds)
+            ? suggestion.requirementIds
+                .map(asString)
+                .filter((id) => allowedRequirementIds.has(id))
+                .slice(0, allowedRequirementIds.size)
+            : [];
+
           return {
             elementId: verified.id,
             elementName: verified.officialName,
             reason: asString(suggestion.reason),
+            requirementIds,
           };
         })
         .filter(Boolean) as Analysis["suggestedClassifications"]
@@ -274,11 +289,7 @@ export default {
         );
       }
 
-      let framework: Array<{
-        id: string;
-        officialName: string;
-        description?: string;
-      }> = [];
+      let framework: WorkerFrameworkElement[] = [];
 
       try {
         const parsed = JSON.parse(frameworkText);
@@ -290,10 +301,26 @@ export default {
                 item && typeof item === "object"
                   ? (item as Record<string, unknown>)
                   : {};
+              const requirements = Array.isArray(data.requirements)
+                ? data.requirements
+                    .slice(0, 30)
+                    .map((requirement) => {
+                      const value =
+                        requirement && typeof requirement === "object"
+                          ? (requirement as Record<string, unknown>)
+                          : {};
+                      return {
+                        id: asString(value.id),
+                        label: asString(value.label),
+                      };
+                    })
+                    .filter((requirement) => requirement.id && requirement.label)
+                : [];
               return {
                 id: asString(data.id),
                 officialName: asString(data.officialName),
                 description: asString(data.description),
+                requirements,
               };
             })
             .filter((item) => item.id && item.officialName);
@@ -344,6 +371,9 @@ NON-NEGOTIABLE RULES:
 - Order suggestedClassifications from strongest evidence match to weakest supported match. The first suggestion is the recommended primary classification.
 - Each classification reason must independently explain the exact evidence that supports that element.
 - Do not add a classification merely because it is thematically related.
+- Each element may contain a list of mandatory requirements. For every suggested classification, return requirementIds only for mandatory requirements that this evidence DIRECTLY documents.
+- Never mark a mandatory requirement merely because it usually accompanies the activity or because the element is related. If the evidence does not prove it, omit its id.
+- requirementIds are suggestions for teacher confirmation, not an automatic score or final decision.
 - draftImpact must contain only impact directly supported by evidence.
 - If no impact is documented, write exactly: "لا يوجد أثر موثق متاح حاليًا."
 - Ask at most ONE essential missing-information question.
@@ -359,7 +389,7 @@ ARABIC OUTPUT RULES:
 Required JSON shape:
 {
   "extractedFacts":[{"fact":"","support":""}],
-  "suggestedClassifications":[{"elementId":"","elementName":"","reason":""}],
+  "suggestedClassifications":[{"elementId":"","elementName":"","reason":"","requirementIds":[]}],
   "draftTitle":"",
   "draftDescription":"",
   "draftImpact":"",
@@ -384,7 +414,7 @@ ${evidence}
           { role: "user", content: prompt },
         ],
         temperature: 0.1,
-        max_completion_tokens: 1400,
+        max_completion_tokens: 1800,
         chat_template_kwargs: { enable_thinking: false },
       });
 

@@ -10,7 +10,13 @@ export type EvidenceStatus =
   | "archived";
 
 export type ExtractedFact = { fact: string; support?: string };
-export type SuggestedClassification = { elementId: string; elementName: string; reason: string };
+export type SuggestedClassification = {
+  elementId: string;
+  elementName: string;
+  reason: string;
+  /** Mandatory follow-up items directly supported by the evidence. Final approval stays with the teacher. */
+  requirementIds?: string[];
+};
 export type MissingInformation = { question: string; reason?: string } | null;
 
 export type AiAnalysis = {
@@ -29,6 +35,8 @@ export type ApprovedClassification = {
   elementName: string;
   reason?: string;
   isPrimary: boolean;
+  /** Mandatory follow-up items confirmed by the teacher as documented by this evidence. */
+  requirementIds?: string[];
 };
 
 export type ApprovedContent = {
@@ -50,6 +58,15 @@ export type EvidenceAttachment = {
   driveFileId?: string;
   driveWebViewLink?: string;
   driveParentFolderId?: string;
+  /** athari_upload = copied into Athari folders; drive_link = stays in the teacher's selected Drive location. */
+  sourceKind?: "athari_upload" | "drive_link";
+};
+
+export type DriveSourceLink = {
+  kind: "file" | "folder";
+  id: string;
+  name: string;
+  webViewLink?: string;
 };
 
 export type EvidenceRecord = {
@@ -68,11 +85,17 @@ export type EvidenceRecord = {
   driveParentFolderId?: string;
   aiAnalysis?: AiAnalysis;
   approvedContent?: ApprovedContent;
+  driveSource?: DriveSourceLink;
   archiveReason?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
   approvedAt?: unknown;
   archivedAt?: unknown;
+};
+
+export type FrameworkRequirement = {
+  id: string;
+  label: string;
 };
 
 export type FrameworkElement = {
@@ -83,4 +106,21 @@ export type FrameworkElement = {
   sourceReference?: string;
   weightPercent?: number;
   category?: "common" | "role_responsibility" | "additional_assignment";
+  requirements?: FrameworkRequirement[];
+};
+
+export type ProfessionalProfile = {
+  fullName: string;
+  specialization: string;
+  qualification: string;
+  university: string;
+  employer: string;
+  school: string;
+  educationDepartment: string;
+  professionalRank: string;
+  experience: string;
+  professionalLicense: string;
+  bio: string;
+  achievements: string[];
+  developmentGoals: string[];
 };

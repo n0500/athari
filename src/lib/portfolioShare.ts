@@ -7,11 +7,14 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { requireDb } from "@/lib/firebase";
+import type { ProfessionalProfile } from "@/types/athari";
+import { normalizeProfessionalProfile } from "@/lib/professionalProfile";
 
 export type ShareClassification = {
   elementId: string;
   elementName: string;
   isPrimary: boolean;
+  requirementIds?: string[];
 };
 
 export type ShareAttachment = {
@@ -43,6 +46,7 @@ export type PortfolioShare = {
   active: boolean;
   evidence: ShareEvidence[];
   drivePermissions: ShareDrivePermission[];
+  professionalProfile?: ProfessionalProfile;
 };
 
 function randomToken() {
@@ -74,6 +78,10 @@ function normalizeShare(id: string, value: unknown): PortfolioShare | null {
     drivePermissions: Array.isArray(raw.drivePermissions)
       ? (raw.drivePermissions as ShareDrivePermission[])
       : [],
+    professionalProfile:
+      raw.professionalProfile && typeof raw.professionalProfile === "object"
+        ? normalizeProfessionalProfile(raw.professionalProfile)
+        : undefined,
   };
 }
 
@@ -97,6 +105,7 @@ export async function createOrUpdatePortfolioShare(input: {
   academicYear: string;
   evidence: ShareEvidence[];
   drivePermissions: ShareDrivePermission[];
+  professionalProfile?: ProfessionalProfile;
 }) {
   const current = await getActivePortfolioShare(input.uid);
   const shareId = current?.id ?? randomToken();
@@ -108,6 +117,9 @@ export async function createOrUpdatePortfolioShare(input: {
     active: true,
     evidence: input.evidence,
     drivePermissions: input.drivePermissions,
+    ...(input.professionalProfile
+      ? { professionalProfile: normalizeProfessionalProfile(input.professionalProfile) }
+      : {}),
     updatedAt: serverTimestamp(),
     ...(current ? {} : { createdAt: serverTimestamp() }),
   });
@@ -149,13 +161,6 @@ export async function getPublicPortfolioShare(token: string) {
   return share?.active ? share : null;
 }
 
-/**
- * Removes from the active share any evidence that is no longer approved
- * (archived or deleted). The share is saved first; the caller then revokes
- * the returned Drive permissions and confirms with `forgetPermissions`.
- * Permissions stay listed on the share until revoked, so a failed revoke
- * can be retried by updating the share.
- */
 export async function pruneActiveShare(uid: string, approvedIds: Set<string>) {
   const share = await getActivePortfolioShare(uid);
   if (!share) return { shareId: "", changed: false, dropped: [] as ShareDrivePermission[] };
@@ -187,7 +192,6 @@ export async function pruneActiveShare(uid: string, approvedIds: Set<string>) {
   };
 }
 
-/** Removes revoked permissions from the share record. */
 export async function forgetPermissions(
   shareId: string,
   revoked: ShareDrivePermission[]

@@ -12,10 +12,11 @@ import {
   upsertAthariBackup,
 } from "@/lib/drive";
 import {
-  approveEvidence,
   getEvidence,
   listUserEvidence,
 } from "@/lib/firestore";
+import { approveEvidenceLinkedSafe } from "@/lib/approveEvidence";
+import { requirementsForElement } from "@/data/mandatory-requirements";
 import {
   ApprovedContent,
   EvidenceAttachment,
@@ -57,6 +58,7 @@ function ReviewInner() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [primaryId, setPrimaryId] = useState("");
+  const [requirementIdsByElement, setRequirementIdsByElement] = useState<Record<string, string[]>>({});
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [impact, setImpact] = useState("");
@@ -72,47 +74,50 @@ function ReviewInner() {
       .then((record) => {
         setItem(record);
 
-        const suggestions =
-          record?.aiAnalysis?.suggestedClassifications?.slice(
-            0,
-            MAX_CLASSIFICATIONS
-          ) ?? [];
-
+        const analysisSuggestions =
+          record?.aiAnalysis?.suggestedClassifications?.slice(0, MAX_CLASSIFICATIONS) ?? [];
         const approved = record?.approvedContent?.classifications ?? [];
+
         const approvedIds = approved
           .map((entry) => entry.elementId)
           .filter((elementId) =>
-            suggestions.some(
-              (suggestion) => suggestion.elementId === elementId
-            )
+            analysisSuggestions.some((suggestion) => suggestion.elementId === elementId)
           )
           .slice(0, MAX_CLASSIFICATIONS);
 
         if (approvedIds.length) {
           setSelectedIds(approvedIds);
           setPrimaryId(
-            approved.find((entry) => entry.isPrimary)?.elementId ??
-              approvedIds[0]
+            approved.find((entry) => entry.isPrimary)?.elementId ?? approvedIds[0]
           );
-        } else if (suggestions[0]) {
-          setSelectedIds([suggestions[0].elementId]);
-          setPrimaryId(suggestions[0].elementId);
+        } else if (analysisSuggestions[0]) {
+          setSelectedIds([analysisSuggestions[0].elementId]);
+          setPrimaryId(analysisSuggestions[0].elementId);
         }
 
+        const requirementMap: Record<string, string[]> = {};
+        for (const suggestion of analysisSuggestions) {
+          const approvedClassification = approved.find(
+            (entry) => entry.elementId === suggestion.elementId
+          );
+          requirementMap[suggestion.elementId] = [
+            ...new Set(
+              approvedClassification?.requirementIds?.length
+                ? approvedClassification.requirementIds
+                : suggestion.requirementIds ?? []
+            ),
+          ];
+        }
+        setRequirementIdsByElement(requirementMap);
+
         setTitle(
-          record?.approvedContent?.title ??
-            record?.aiAnalysis?.draftTitle ??
-            ""
+          record?.approvedContent?.title ?? record?.aiAnalysis?.draftTitle ?? ""
         );
         setDescription(
-          record?.approvedContent?.description ??
-            record?.aiAnalysis?.draftDescription ??
-            ""
+          record?.approvedContent?.description ?? record?.aiAnalysis?.draftDescription ?? ""
         );
         setImpact(
-          record?.approvedContent?.impact ??
-            record?.aiAnalysis?.draftImpact ??
-            ""
+          record?.approvedContent?.impact ?? record?.aiAnalysis?.draftImpact ?? ""
         );
       })
       .catch(() => setError("تعذر تحميل الشاهد."))
@@ -120,19 +125,12 @@ function ReviewInner() {
   }, [id]);
 
   const suggestions = useMemo(
-    () =>
-      item?.aiAnalysis?.suggestedClassifications?.slice(
-        0,
-        MAX_CLASSIFICATIONS
-      ) ?? [],
+    () => item?.aiAnalysis?.suggestedClassifications?.slice(0, MAX_CLASSIFICATIONS) ?? [],
     [item]
   );
 
   const selectedClassifications = useMemo(
-    () =>
-      suggestions.filter((suggestion) =>
-        selectedIds.includes(suggestion.elementId)
-      ),
+    () => suggestions.filter((suggestion) => selectedIds.includes(suggestion.elementId)),
     [suggestions, selectedIds]
   );
 
@@ -151,22 +149,24 @@ function ReviewInner() {
   function toggleClassification(suggestion: SuggestedClassification) {
     setSelectedIds((current) => {
       if (current.includes(suggestion.elementId)) {
-        const next = current.filter(
-          (elementId) => elementId !== suggestion.elementId
-        );
-
-        if (primaryId === suggestion.elementId) {
-          setPrimaryId(next[0] ?? "");
-        }
-
+        const next = current.filter((elementId) => elementId !== suggestion.elementId);
+        if (primaryId === suggestion.elementId) setPrimaryId(next[0] ?? "");
         return next;
       }
-
       if (current.length >= MAX_CLASSIFICATIONS) return current;
-
       const next = [...current, suggestion.elementId];
       if (!primaryId) setPrimaryId(suggestion.elementId);
       return next;
+    });
+  }
+
+  function toggleRequirement(elementId: string, requirementId: string) {
+    setRequirementIdsByElement((current) => {
+      const list = current[elementId] ?? [];
+      const next = list.includes(requirementId)
+        ? list.filter((id) => id !== requirementId)
+        : [...list, requirementId];
+      return { ...current, [elementId]: next };
     });
   }
 
@@ -174,9 +174,8 @@ function ReviewInner() {
     if (!item || !selectedClassifications.length || !canApprove) return;
 
     const primary =
-      selectedClassifications.find(
-        (suggestion) => suggestion.elementId === primaryId
-      ) ?? selectedClassifications[0];
+      selectedClassifications.find((suggestion) => suggestion.elementId === primaryId) ??
+      selectedClassifications[0];
 
     const ordered = [
       primary,
@@ -198,21 +197,28 @@ function ReviewInner() {
       }
 
       const token = await ensureDriveAccessToken();
-      const { element } = await ensureAthariElementFolder(
-        token,
-        item.academicYear,
-        primary.elementName
+      const originals = attachmentsFor(item);
+      const movable = originals.filter(
+        (attachment) => attachment.sourceKind !== "drive_link" && attachment.driveFileId
       );
 
-      const originals = attachmentsFor(item);
-      for (const attachment of originals) {
-        if (!attachment.driveFileId) continue;
-        await moveDriveFile(
+      let movedParentId: string | undefined;
+      if (movable.length) {
+        const { element } = await ensureAthariElementFolder(
           token,
-          attachment.driveFileId,
-          attachment.driveParentFolderId,
-          element.id
+          item.academicYear,
+          primary.elementName
         );
+        movedParentId = element.id;
+        for (const attachment of movable) {
+          if (!attachment.driveFileId) continue;
+          await moveDriveFile(
+            token,
+            attachment.driveFileId,
+            attachment.driveParentFolderId,
+            element.id
+          );
+        }
       }
 
       stage = "firestore";
@@ -220,24 +226,30 @@ function ReviewInner() {
       const approved: ApprovedContent = {
         elementId: primary.elementId,
         elementName: primary.elementName,
-        classifications: ordered.map((suggestion) => ({
-          elementId: suggestion.elementId,
-          elementName: suggestion.elementName,
-          reason: suggestion.reason,
-          isPrimary: suggestion.elementId === primary.elementId,
-        })),
+        classifications: ordered.map((suggestion) => {
+          const allowed = new Set(
+            requirementsForElement(suggestion.elementId).map((requirement) => requirement.id)
+          );
+          return {
+            elementId: suggestion.elementId,
+            elementName: suggestion.elementName,
+            reason: suggestion.reason,
+            isPrimary: suggestion.elementId === primary.elementId,
+            requirementIds: (requirementIdsByElement[suggestion.elementId] ?? []).filter((id) => allowed.has(id)),
+          };
+        }),
         title: title.trim(),
         description: description.trim(),
         impact: impact.trim(),
       };
 
-      await approveEvidence(id, approved, element.id);
+      await approveEvidenceLinkedSafe(id, approved, movedParentId);
       stage = "backup";
 
       try {
         const all = await listUserEvidence(user.uid);
         await upsertAthariBackup(token, {
-          format: "athari-backup-v3",
+          format: "athari-backup-v4",
           exportedAt: new Date().toISOString(),
           evidence: all.map((entry) => ({
             id: entry.id,
@@ -248,6 +260,7 @@ function ReviewInner() {
             attachments: entry.attachments,
             driveFileId: entry.driveFileId,
             driveWebViewLink: entry.driveWebViewLink,
+            driveSource: entry.driveSource,
             approvedContent: entry.approvedContent,
           })),
         });
@@ -260,17 +273,11 @@ function ReviewInner() {
       const raw = caught instanceof Error ? caught.message : "UNKNOWN";
 
       if (raw === "DRIVE_RECONNECT_REQUIRED") {
-        setError(
-          "انتهت جلسة Google Drive. اضغطي «اعتماد الشاهد» مرة أخرى لإعادة الربط."
-        );
+        setError("يرجى تسجيل الدخول إلى Google ثم الضغط على «اعتماد الشاهد» مرة أخرى.");
       } else if (stage === "drive") {
-        setError(
-          "تعذر ترتيب أحد ملفات الشاهد في Drive الآن. لم يُحذف أي أصل؛ أعيدي المحاولة."
-        );
+        setError("تعذر ترتيب أحد ملفات الشاهد في Google Drive الآن. لم يُحذف أي أصل؛ أعيدي المحاولة.");
       } else if (stage === "firestore") {
-        setError(
-          "تم ترتيب الأصول في Drive، لكن تعذر حفظ الاعتماد في أثري. أعيدي المحاولة؛ لن تتكرر الملفات."
-        );
+        setError("تم ترتيب الملفات، لكن تعذر حفظ الاعتماد في أثري. أعيدي المحاولة؛ لن تتكرر الملفات.");
       } else {
         setError("تم الاعتماد، لكن تعذر تحديث النسخة الاحتياطية الآن.");
       }
@@ -301,8 +308,7 @@ function ReviewInner() {
   const originals = attachmentsFor(item);
 
   return (
-    <AthShell back={back} title="مراجعة الشاهد" subtitle="مراجعة البيانات والتصنيف قبل الاعتماد.">
-
+    <AthShell back={back} title="مراجعة الشاهد" subtitle="مراجعة البيانات والتصنيف وبنود المتابعة قبل الاعتماد.">
       <div className="ath-steps" aria-label="مراحل إضافة الشاهد">
         <span className="on"><b>1</b>اختيار</span>
         <span className="on"><b>2</b>تحليل</span>
@@ -312,13 +318,16 @@ function ReviewInner() {
       <Panel
         icon={<Glyph name="folder" size={22} />}
         title={originals.length === 1 ? "ملف واحد لهذا الشاهد" : originals.length === 2 ? "ملفان لهذا الشاهد" : `${originals.length} ملفات لهذا الشاهد`}
-        sub="الأصول محفوظة في Google Drive"
+        sub={originals.some((attachment) => attachment.sourceKind === "drive_link") ? "مرتبط من Google Drive · الأصول تبقى في مكانها" : "الأصول محفوظة في Google Drive"}
       >
         <div className="ath-stack">
           {originals.map((attachment, index) => (
             <div className="ath-file-row" key={`${attachment.originalFileName}-${index}`}>
               <span className="ic"><Glyph name="docOutline" size={18} /></span>
-              <div className="nm"><strong>{attachment.originalFileName}</strong></div>
+              <div className="nm">
+                <strong>{attachment.originalFileName}</strong>
+                {attachment.sourceKind === "drive_link" ? <span>مرتبط من Drive</span> : null}
+              </div>
               {attachment.driveWebViewLink ? (
                 <a className="ath-icon-btn blue" href={attachment.driveWebViewLink} target="_blank" rel="noreferrer" aria-label={`فتح ${attachment.originalFileName}`}>
                   <Glyph name="external" size={17} />
@@ -329,55 +338,80 @@ function ReviewInner() {
         </div>
       </Panel>
 
+      {item.driveSource?.kind === "folder" ? (
+        <Panel icon={<Glyph name="folder" size={22} />} title="مجلد Google Drive مرتبط" sub="يبقى المجلد خاصًا ولا يُشارك كاملًا مع رابط ملف الأداء.">
+          <div className="ath-file-row">
+            <span className="ic"><Glyph name="folder" size={18} /></span>
+            <div className="nm"><strong>{item.driveSource.name}</strong><span>مصدر الشاهد في Google Drive</span></div>
+            {item.driveSource.webViewLink ? (
+              <a className="ath-icon-btn blue" href={item.driveSource.webViewLink} target="_blank" rel="noreferrer" aria-label={`فتح مجلد ${item.driveSource.name}`}>
+                <Glyph name="external" size={17} />
+              </a>
+            ) : null}
+          </div>
+        </Panel>
+      ) : null}
+
       <Panel icon={<Glyph name="sparkle" size={22} />} title="ما فهمه أثري من الشاهد" sub="من محتوى الشاهد">
         {analysis?.extractedFacts?.length ? (
           <ul className="ath-facts">
             {analysis.extractedFacts.map((fact, index) => (
               <li key={index}>
                 <Glyph name="check" size={16} />
-                <span>
-                  {fact.fact}
-                  {fact.support ? <small>{fact.support}</small> : null}
-                </span>
+                <span>{fact.fact}{fact.support ? <small>{fact.support}</small> : null}</span>
               </li>
             ))}
           </ul>
         ) : (
           <p className="ath-fine" style={{ marginTop: 10 }}>لم تُستخرج حقائق بعد.</p>
         )}
-        {analysis?.warnings?.length ? (
-          <div style={{ marginTop: 10 }}><Notice>{analysis.warnings.join(" ")}</Notice></div>
-        ) : null}
+        {analysis?.warnings?.length ? <div style={{ marginTop: 10 }}><Notice>{analysis.warnings.join(" ")}</Notice></div> : null}
       </Panel>
 
-      <Panel icon={<Glyph name="bars" size={22} />} iconTone="blue" title="التصنيفات المقترحة" sub={`حتى ${MAX_CLASSIFICATIONS} عناصر`}>
+      <Panel icon={<Glyph name="bars" size={22} />} iconTone="blue" title="التصنيفات وبنود المتابعة" sub={`حتى ${MAX_CLASSIFICATIONS} عناصر`}>
         {suggestions.length ? (
           <div className="ath-stack">
-            <p className="ath-fine">
-              التصنيف الأساسي يحدد مجلد الشاهد، ويمكن إضافة تصنيفات مشتركة.
-            </p>
+            <p className="ath-fine">اختاري العنصر، ثم أكدي فقط بنود المتابعة التي يثبتها هذا الشاهد. اقتراح أثري لا يعتمد أي بند تلقائيًا.</p>
             {suggestions.map((suggestion) => {
               const isSelected = selectedIds.includes(suggestion.elementId);
               const isPrimary = isSelected && primaryId === suggestion.elementId;
+              const requirements = requirementsForElement(suggestion.elementId);
+              const selectedRequirements = requirementIdsByElement[suggestion.elementId] ?? [];
+              const aiSuggested = new Set(suggestion.requirementIds ?? []);
               return (
                 <div key={suggestion.elementId} className={`ath-choice ${isSelected ? "sel" : ""}`}>
                   <button type="button" className="main" onClick={() => toggleClassification(suggestion)} aria-pressed={isSelected}>
                     <ElementArt elementId={suggestion.elementId} className="art" />
-                    <span className="tx">
-                      <strong>{suggestion.elementName}</strong>
-                      <p>{suggestion.reason}</p>
-                    </span>
+                    <span className="tx"><strong>{suggestion.elementName}</strong><p>{suggestion.reason}</p></span>
                     <Glyph name={isSelected ? "check" : "empty"} size={24} />
                   </button>
                   {isSelected ? (
-                    <div className="foot">
-                      <span className={`badge ${isPrimary ? "" : "alt"}`}>{isPrimary ? "التصنيف الأساسي" : "شاهد مشترك"}</span>
-                      {!isPrimary ? (
-                        <button type="button" className="ath-text-btn" onClick={() => setPrimaryId(suggestion.elementId)}>
-                          اجعليه الأساسي
-                        </button>
+                    <>
+                      <div className="foot">
+                        <span className={`badge ${isPrimary ? "" : "alt"}`}>{isPrimary ? "التصنيف الأساسي" : "شاهد مشترك"}</span>
+                        {!isPrimary ? <button type="button" className="ath-text-btn" onClick={() => setPrimaryId(suggestion.elementId)}>اجعليه الأساسي</button> : null}
+                      </div>
+                      {requirements.length ? (
+                        <div style={{ padding: "6px 14px 14px" }}>
+                          <strong style={{ display: "block", marginBottom: 8 }}>بنود المتابعة الإلزامية</strong>
+                          <div className="ath-stack">
+                            {requirements.map((requirement) => {
+                              const checked = selectedRequirements.includes(requirement.id);
+                              return (
+                                <label key={requirement.id} style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "10px 0", cursor: "pointer", borderBottom: "1px solid rgba(0,0,0,.06)" }}>
+                                  <input type="checkbox" checked={checked} onChange={() => toggleRequirement(suggestion.elementId, requirement.id)} style={{ marginTop: 4 }} />
+                                  <span style={{ flex: 1 }}>
+                                    <span>{requirement.label}</span>
+                                    {aiSuggested.has(requirement.id) ? <small style={{ display: "block", marginTop: 3, opacity: .66 }}>متوافق مع محتوى الشاهد</small> : null}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                          <small className="ath-fine">تم تحديد {selectedRequirements.length} من {requirements.length} بنود لهذا الشاهد.</small>
+                        </div>
                       ) : null}
-                    </div>
+                    </>
                   ) : null}
                 </div>
               );
@@ -389,40 +423,24 @@ function ReviewInner() {
       </Panel>
 
       <Panel icon={<Glyph name="docOutline" size={22} />} title="الصياغة المقترحة" sub="قابلة للتعديل">
-        <div className="ath-field">
-          <label htmlFor="ev-title">عنوان الشاهد</label>
-          <input id="ev-title" value={title} onChange={(event) => setTitle(event.target.value)} />
-        </div>
-        <div className="ath-field">
-          <label htmlFor="ev-desc">وصف التنفيذ</label>
-          <textarea id="ev-desc" value={description} onChange={(event) => setDescription(event.target.value)} />
-        </div>
-        <div className="ath-field">
-          <label htmlFor="ev-impact">الأثر المدعوم</label>
-          <textarea id="ev-impact" value={impact} onChange={(event) => setImpact(event.target.value)} />
-        </div>
+        <div className="ath-field"><label htmlFor="ev-title">عنوان الشاهد</label><input id="ev-title" value={title} onChange={(event) => setTitle(event.target.value)} /></div>
+        <div className="ath-field"><label htmlFor="ev-desc">وصف التنفيذ</label><textarea id="ev-desc" value={description} onChange={(event) => setDescription(event.target.value)} /></div>
+        <div className="ath-field"><label htmlFor="ev-impact">الأثر المدعوم</label><textarea id="ev-impact" value={impact} onChange={(event) => setImpact(event.target.value)} /></div>
       </Panel>
 
       {analysis?.missingInformation ? (
         <section className="ath-question">
           <span className="ic"><Glyph name="alert" size={20} /></span>
-          <div>
-            <small>معلومة تحتاج تأكيدك</small>
-            <h2>{analysis.missingInformation.question}</h2>
-          </div>
+          <div><small>معلومة تحتاج تأكيدك</small><h2>{analysis.missingInformation.question}</h2></div>
         </section>
       ) : null}
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 
       <div className="ath-sticky">
-        <div className="v7-field-head">
-          <strong>الاعتماد</strong>
-          <InfoTip text="بعد الاعتماد يدخل الشاهد في ملف الأداء." />
-        </div>
+        <div className="v7-field-head"><strong>الاعتماد</strong><InfoTip text="بعد الاعتماد يدخل الشاهد في ملف الأداء وتُحتسب فقط بنود المتابعة التي أكدتِها." /></div>
         <button type="button" className="ath-btn primary block" onClick={approve} disabled={!canApprove || saving}>
-          <Glyph name="check" />
-          {saving ? "جاري الاعتماد…" : "اعتماد الشاهد"}
+          <Glyph name="check" />{saving ? "جاري الاعتماد…" : "اعتماد الشاهد"}
         </button>
       </div>
     </AthShell>

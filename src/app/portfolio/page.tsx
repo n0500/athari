@@ -10,6 +10,7 @@ import {
   EvidenceTiles,
   Glyph,
   Notice,
+  Panel,
   PortfolioHero,
   SectionHead,
   StatStrip,
@@ -24,6 +25,7 @@ import {
   revokePortfolioPermissions,
 } from "@/lib/drive";
 import { listUserEvidence } from "@/lib/firestore";
+import { getProfessionalProfile } from "@/lib/professionalProfile";
 import {
   createOrUpdatePortfolioShare,
   forgetPermissions,
@@ -36,10 +38,12 @@ import type {
   ShareEvidence,
 } from "@/lib/portfolioShare";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
+import { MANDATORY_REQUIREMENT_COUNT } from "@/data/mandatory-requirements";
 import {
   ApprovedClassification,
   EvidenceAttachment,
   EvidenceRecord,
+  ProfessionalProfile,
 } from "@/types/athari";
 
 function classificationsFor(item: EvidenceRecord): ApprovedClassification[] {
@@ -56,6 +60,7 @@ function classificationsFor(item: EvidenceRecord): ApprovedClassification[] {
         elementId: approved.elementId,
         elementName: approved.elementName,
         isPrimary: true,
+        requirementIds: [],
       },
     ];
   }
@@ -88,6 +93,7 @@ function shareEvidenceFor(items: EvidenceRecord[]): ShareEvidence[] {
       elementId: classification.elementId,
       elementName: classification.elementName,
       isPrimary: classification.isPrimary,
+      requirementIds: classification.requirementIds ?? [],
     })),
     attachments: attachmentsFor(item).map((attachment) => ({
       originalFileName: attachment.originalFileName,
@@ -102,6 +108,7 @@ function shareEvidenceFor(items: EvidenceRecord[]): ShareEvidence[] {
 export default function PortfolioPage() {
   const [items, setItems] = useState<EvidenceRecord[]>([]);
   const [user, setUser] = useState<User | null>(null);
+  const [professionalProfile, setProfessionalProfile] = useState<ProfessionalProfile | null>(null);
   const [loading, setLoading] = useState(firebaseConfigured);
   const [error, setError] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
@@ -112,7 +119,6 @@ export default function PortfolioPage() {
   const [justAdded, setJustAdded] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
-  // «إدارة مشاركة ملف الأداء» in الحساب opens this page with ?share=1
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("share") === "1") setShareOpen(true);
   }, []);
@@ -142,12 +148,14 @@ export default function PortfolioPage() {
 
       try {
         setError("");
-        const [all, activeShare] = await Promise.all([
+        const [all, activeShare, profile] = await Promise.all([
           listUserEvidence(nextUser.uid),
           getActivePortfolioShare(nextUser.uid).catch(() => null),
+          getProfessionalProfile(nextUser.uid).catch(() => null),
         ]);
 
         setItems(all.filter((item) => item.status === "approved"));
+        setProfessionalProfile(profile);
 
         if (activeShare && typeof window !== "undefined") {
           setShareId(activeShare.id);
@@ -180,6 +188,16 @@ export default function PortfolioPage() {
     [evidenceByElement]
   );
 
+  const completedRequirementIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of items) {
+      for (const classification of classificationsFor(item)) {
+        classification.requirementIds?.forEach((id) => set.add(id));
+      }
+    }
+    return set;
+  }, [items]);
+
   const year = process.env.NEXT_PUBLIC_ATHARI_ACADEMIC_YEAR || "1448هـ";
   const totalElements = OFFICIAL_TEACHER_FRAMEWORK_V2.length;
 
@@ -211,7 +229,7 @@ export default function PortfolioPage() {
     const ok = window.confirm(
       shareUrl
         ? "تحديث مشاركة ملف الأداء بالشواهد المعتمدة الحالية؟"
-        : "إنشاء رابط لمشاركة ملف الأداء؟ يعرض الرابط الشواهد المعتمدة فقط دون الوصول إلى بقية ملفاتك."
+        : "إنشاء رابط لمشاركة ملف الأداء؟ يعرض الرابط الهوية المهنية والشواهد المعتمدة فقط دون الوصول إلى بقية ملفاتك."
     );
     if (!ok) return;
 
@@ -223,7 +241,6 @@ export default function PortfolioPage() {
       const currentShare = await getActivePortfolioShare(user.uid).catch(() => null);
       const previousPermissions = currentShare?.drivePermissions ?? sharePermissions;
 
-      // Adds Drive access; on failure it withdraws what it added.
       const published = await publishPortfolioFiles(token, driveFileIds, previousPermissions);
 
       const currentIds = new Set(driveFileIds);
@@ -231,19 +248,17 @@ export default function PortfolioPage() {
         (permission) => !currentIds.has(permission.driveFileId)
       );
 
-      // 1) Save the new shared copy first. Outgoing permissions stay listed
-      //    until revoked, so a failed revoke can be retried on the next update.
       let share: Awaited<ReturnType<typeof createOrUpdatePortfolioShare>>;
       try {
         share = await createOrUpdatePortfolioShare({
           uid: user.uid,
-          ownerDisplayName: user.displayName?.trim() || "صاحبة الملف",
+          ownerDisplayName: professionalProfile?.fullName || user.displayName?.trim() || "صاحبة الملف",
           academicYear: year,
           evidence: shareEvidenceFor(items),
           drivePermissions: [...published, ...removedPermissions],
+          ...(professionalProfile ? { professionalProfile } : {}),
         });
       } catch (shareError) {
-        // Not saved: withdraw the Drive access added in this attempt.
         await revokePortfolioPermissions(
           token,
           newlyAddedPermissions(published, previousPermissions)
@@ -251,7 +266,6 @@ export default function PortfolioPage() {
         throw shareError;
       }
 
-      // 2) Only after the save succeeds, withdraw access to files that left the share.
       let kept = [...published, ...removedPermissions];
       if (removedPermissions.length) {
         try {
@@ -272,7 +286,7 @@ export default function PortfolioPage() {
       const raw = caught instanceof Error ? caught.message : "UNKNOWN";
       setShareMessage(
         raw === "DRIVE_RECONNECT_REQUIRED"
-          ? "انتهت جلسة Google Drive. أعيدي المحاولة لإعادة الربط."
+          ? "يرجى تسجيل الدخول إلى Google ثم إعادة المحاولة."
           : "تعذر حفظ المشاركة الآن، ولم تُمنح أي صلاحية جديدة على ملفاتك."
       );
     } finally {
@@ -306,7 +320,7 @@ export default function PortfolioPage() {
       const raw = caught instanceof Error ? caught.message : "UNKNOWN";
       setShareMessage(
         raw === "DRIVE_RECONNECT_REQUIRED"
-          ? "انتهت جلسة Google Drive. أعيدي المحاولة لإيقاف المشاركة."
+          ? "يرجى تسجيل الدخول إلى Google ثم إعادة المحاولة لإيقاف المشاركة."
           : "تعذر إيقاف المشاركة الآن. حاولي مرة أخرى."
       );
     } finally {
@@ -334,18 +348,16 @@ export default function PortfolioPage() {
     };
   });
 
-  const ownerName = user?.displayName?.trim() || "";
+  const ownerName = professionalProfile?.fullName || user?.displayName?.trim() || "";
 
   return (
     <AthShell title="ملف الأداء المهني" subtitle="عناصر التقييم والشواهد المرتبطة بها.">
       {justAdded ? (
         <section className="ath-success ath-scene-card" role="status">
-          <button type="button" className="x" onClick={() => setJustAdded(false)} aria-label="إغلاق">
-            <span aria-hidden>×</span>
-          </button>
+          <button type="button" className="x" onClick={() => setJustAdded(false)} aria-label="إغلاق"><span aria-hidden>×</span></button>
           <Scene kind="success" />
           <strong>أُضيف الشاهد إلى ملف الأداء</strong>
-          <p>اعتُمد الشاهد وأُضيف إلى ملف الأداء.</p>
+          <p>اعتُمد الشاهد واحتُسبت بنود المتابعة التي أكدتِها.</p>
         </section>
       ) : null}
 
@@ -359,15 +371,18 @@ export default function PortfolioPage() {
         browse={{ href: "/preview" }}
         browseLabel="معاينة / طباعة"
         extra={
-          <button
-            type="button"
-            className="ath-btn white"
-            aria-expanded={shareOpen}
-            aria-controls="portfolio-share"
-            onClick={() => setShareOpen((value) => !value)}
-          >
-            <Icon name="share" size={18} /> مشاركة ملف الأداء
-          </button>
+          <>
+            <Link className="ath-btn white" href="/profile"><Glyph name="user" size={18} /> الهوية المهنية</Link>
+            <button
+              type="button"
+              className="ath-btn white"
+              aria-expanded={shareOpen}
+              aria-controls="portfolio-share"
+              onClick={() => setShareOpen((value) => !value)}
+            >
+              <Icon name="share" size={18} /> مشاركة ملف الأداء
+            </button>
+          </>
         }
       />
 
@@ -376,36 +391,23 @@ export default function PortfolioPage() {
           <div className="ath-ph">
             <span className="sq blue"><Icon name="share" size={22} /></span>
             <div style={{ flex: 1 }}>
-              <h2 className="v7-inline">
-                مشاركة ملف الأداء
-                <InfoTip text="يعرض الرابط الشواهد المعتمدة فقط دون الوصول إلى بقية ملفاتك." />
-              </h2>
-              <p className="sub">عرض الشواهد المعتمدة وعناصر التقييم.</p>
+              <h2 className="v7-inline">مشاركة ملف الأداء<InfoTip text="يعرض الرابط الهوية المهنية والشواهد المعتمدة فقط دون الوصول إلى بقية ملفاتك أو مجلداتك." /></h2>
+              <p className="sub">الهوية المهنية، عناصر التقييم، بنود المتابعة والشواهد المعتمدة.</p>
             </div>
             <span className={`v7-share-status ${shareUrl ? "on" : "off"}`}>{shareUrl ? "مفعّلة" : "غير مفعّلة"}</span>
           </div>
           <div className="ath-share-body">
             {shareUrl ? (
               <>
-                <a className="ath-share-url" href={shareUrl} target="_blank" rel="noreferrer">
-                  <span>{shareUrl}</span>
-                </a>
+                <a className="ath-share-url" href={shareUrl} target="_blank" rel="noreferrer"><span>{shareUrl}</span></a>
                 <div className="ath-actions">
-                  <button type="button" className="ath-btn primary" onClick={() => copyShareLink(shareUrl)}>
-                    <Icon name="copy" size={17} /> نسخ الرابط
-                  </button>
-                  <button type="button" className="ath-btn outline" onClick={createShare} disabled={shareBusy || !items.length}>
-                    {shareBusy ? "جاري التحديث…" : "تحديث المشاركة"}
-                  </button>
+                  <button type="button" className="ath-btn primary" onClick={() => copyShareLink(shareUrl)}><Icon name="copy" size={17} /> نسخ الرابط</button>
+                  <button type="button" className="ath-btn outline" onClick={createShare} disabled={shareBusy || !items.length}>{shareBusy ? "جاري التحديث…" : "تحديث المشاركة"}</button>
                 </div>
-                <button type="button" className="ath-btn danger" onClick={revokeShare} disabled={shareBusy}>
-                  إيقاف المشاركة
-                </button>
+                <button type="button" className="ath-btn danger" onClick={revokeShare} disabled={shareBusy}>إيقاف المشاركة</button>
               </>
             ) : (
-              <button type="button" className="ath-btn primary" onClick={createShare} disabled={shareBusy || !items.length}>
-                <Icon name="share" size={18} /> {shareBusy ? "جاري الإنشاء…" : "إنشاء رابط المشاركة"}
-              </button>
+              <button type="button" className="ath-btn primary" onClick={createShare} disabled={shareBusy || !items.length}><Icon name="share" size={18} /> {shareBusy ? "جاري الإنشاء…" : "إنشاء رابط المشاركة"}</button>
             )}
             {!items.length && !loading ? <p className="ath-fine">تُتاح المشاركة بعد اعتماد شاهد واحد على الأقل.</p> : null}
             {shareMessage ? <Notice>{shareMessage}</Notice> : null}
@@ -414,43 +416,33 @@ export default function PortfolioPage() {
       ) : null}
 
       <StatStrip
-        first={
-          shareUrl
-            ? { title: "المشاركة مفعّلة", sub: "مشاركة ملف الأداء" }
-            : { title: "المشاركة غير مفعّلة", sub: "مشاركة ملف الأداء" }
-        }
+        first={shareUrl ? { title: "المشاركة مفعّلة", sub: "مشاركة ملف الأداء" } : { title: "المشاركة غير مفعّلة", sub: "مشاركة ملف الأداء" }}
         evidenceCount={items.length}
         covered={covered.size}
         total={totalElements}
       />
 
+      <Panel
+        icon={<Glyph name="bars" size={22} />}
+        title="اكتمال بنود المتابعة الإلزامية"
+        sub={`${completedRequirementIds.size} من ${MANDATORY_REQUIREMENT_COUNT} بندًا موثقًا بشواهد معتمدة`}
+      >
+        <div style={{ height: 10, borderRadius: 999, background: "rgba(0,0,0,.07)", overflow: "hidden" }}>
+          <div style={{ width: `${MANDATORY_REQUIREMENT_COUNT ? Math.round((completedRequirementIds.size / MANDATORY_REQUIREMENT_COUNT) * 100) : 0}%`, height: "100%", borderRadius: 999, background: "currentColor" }} />
+        </div>
+        <p className="ath-fine" style={{ marginTop: 8 }}>وجود شاهد تحت العنصر لا يعني اكتمال جميع بنوده؛ يُحتسب فقط البند الذي تم تأكيده عند اعتماد الشاهد.</p>
+      </Panel>
+
       {error ? <Notice tone="error">{error}</Notice> : null}
 
-      <SectionHead
-        icon={<Glyph name="bars" />}
-        title="عناصر التقييم"
-        side={<CountChip total={totalElements} />}
-      />
-      <ElementGrid
-        elements={elementSummaries}
-        tapFor={(id) => ({ href: `/element?id=${encodeURIComponent(id)}` })}
-      />
+      <SectionHead icon={<Glyph name="bars" />} title="عناصر التقييم" side={<CountChip total={totalElements} />} />
+      <ElementGrid elements={elementSummaries} tapFor={(id) => ({ href: `/element?id=${encodeURIComponent(id)}` })} />
 
       <SectionHead
         icon={<Glyph name="doc" className="ath-green-ico" />}
         title="الشواهد المعتمدة"
-        sub={
-          loading
-            ? "جاري التحميل…"
-            : items.length
-              ? `${items.length} ${items.length === 1 ? "شاهد معتمد" : "شواهد معتمدة"}`
-              : "لا توجد شواهد معتمدة بعد."
-        }
-        side={
-          <Link className="ath-link-btn" href="/evidence">
-            عرض جميع الشواهد <Glyph name="chevLeft" size={14} />
-          </Link>
-        }
+        sub={loading ? "جاري التحميل…" : items.length ? `${items.length} ${items.length === 1 ? "شاهد معتمد" : "شواهد معتمدة"}` : "لا توجد شواهد معتمدة بعد."}
+        side={<Link className="ath-link-btn" href="/evidence">عرض جميع الشواهد <Glyph name="chevLeft" size={14} /></Link>}
       />
       {tiles.length ? (
         <EvidenceTiles items={tiles} />
@@ -461,7 +453,6 @@ export default function PortfolioPage() {
           <Link className="ath-btn primary fit" href="/evidence/new"><Glyph name="plus" />إضافة أول شاهد</Link>
         </section>
       ) : null}
-
     </AthShell>
   );
 }

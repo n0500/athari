@@ -1,24 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AthShell, ElementDetail, Notice } from "@/components/athari-ui/Ui";
+import { AthShell, ElementDetail, Glyph, Notice, Panel } from "@/components/athari-ui/Ui";
 import { Icon } from "@/components/Icon";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import { ELEMENT_GUIDANCE } from "@/data/element-guidance";
+import { requirementsForElement } from "@/data/mandatory-requirements";
 import { requireAuth } from "@/lib/firebase";
 import { listUserEvidence } from "@/lib/firestore";
-import type { EvidenceAttachment, EvidenceRecord } from "@/types/athari";
+import type { ApprovedClassification, EvidenceAttachment, EvidenceRecord } from "@/types/athari";
+
+function classificationForElement(item: EvidenceRecord, elementId: string): ApprovedClassification | null {
+  const approved = item.approvedContent;
+  if (!approved) return null;
+  if (approved.classifications?.length) {
+    return approved.classifications.find((entry) => entry.elementId === elementId) ?? null;
+  }
+  if (approved.elementId === elementId) {
+    return {
+      elementId: approved.elementId,
+      elementName: approved.elementName,
+      isPrimary: true,
+      requirementIds: [],
+    };
+  }
+  return null;
+}
 
 function itemCoversElement(item: EvidenceRecord, elementId: string) {
-  const approved = item.approvedContent;
-  if (!approved) return false;
-  if (approved.classifications?.length) {
-    return approved.classifications.some((entry) => entry.elementId === elementId);
-  }
-  return approved.elementId === elementId;
+  return Boolean(classificationForElement(item, elementId));
 }
 
 function attachmentsFor(item: EvidenceRecord): EvidenceAttachment[] {
@@ -67,6 +80,20 @@ function ElementPageInner() {
       }
     });
   }, [elementId]);
+
+  const requirements = useMemo(
+    () => (element ? requirementsForElement(element.id) : []),
+    [element]
+  );
+
+  const completedRequirementIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of items) {
+      const classification = classificationForElement(item, elementId);
+      classification?.requirementIds?.forEach((id) => set.add(id));
+    }
+    return set;
+  }, [items, elementId]);
 
   if (!element) {
     return (
@@ -124,6 +151,29 @@ function ElementPageInner() {
           { label: "عناصر التقييم", tap: { href: "/portfolio" } },
         ]}
       />
+
+      {requirements.length ? (
+        <Panel
+          icon={<Glyph name="bars" size={22} />}
+          title="بنود المتابعة الإلزامية"
+          sub={loading ? "جاري التحميل…" : `${completedRequirementIds.size} من ${requirements.length} بنود موثقة`}
+        >
+          <div className="ath-stack">
+            {requirements.map((requirement) => {
+              const done = completedRequirementIds.has(requirement.id);
+              return (
+                <div className="ath-file-row" key={requirement.id}>
+                  <span className="ic"><Glyph name={done ? "check" : "empty"} size={19} /></span>
+                  <div className="nm"><strong>{requirement.label}</strong><span>{done ? "موثق بشاهد معتمد" : "يحتاج شاهدًا موثقًا"}</span></div>
+                </div>
+              );
+            })}
+          </div>
+          {items.length && completedRequirementIds.size === 0 ? (
+            <Notice>الشواهد المعتمدة السابقة لا تُحتسب على البنود تلقائيًا. افتحي الشاهد وأكدي البنود التي يثبتها.</Notice>
+          ) : null}
+        </Panel>
+      ) : null}
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 

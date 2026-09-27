@@ -9,12 +9,18 @@ import {
   ElementGrid,
   EvidenceTiles,
   Glyph,
+  Panel,
   PortfolioHero,
   SectionHead,
   StatStrip,
 } from "@/components/athari-ui/Ui";
+import { ProfessionalIdentityCard } from "@/components/ProfessionalIdentityCard";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import { ELEMENT_GUIDANCE } from "@/data/element-guidance";
+import {
+  MANDATORY_REQUIREMENT_COUNT,
+  requirementsForElement,
+} from "@/data/mandatory-requirements";
 import { getPublicPortfolioShare } from "@/lib/portfolioShare";
 import type {
   PortfolioShare,
@@ -40,6 +46,15 @@ function uniqueEvidenceById(items: ShareEvidence[]) {
     seen.add(item.id);
     return true;
   });
+}
+
+function completedRequirementsForElement(evidence: ShareEvidence[], elementId: string) {
+  const set = new Set<string>();
+  for (const item of evidence) {
+    const classification = item.classifications.find((entry) => entry.elementId === elementId);
+    classification?.requirementIds?.forEach((id) => set.add(id));
+  }
+  return set;
 }
 
 export default function PublicSharePage() {
@@ -95,6 +110,17 @@ export default function PublicSharePage() {
     () => uniqueEvidenceById(grouped.flatMap((group) => group.evidence)),
     [grouped]
   );
+
+  const completedRequirementIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!share) return set;
+    for (const item of share.evidence) {
+      for (const classification of item.classifications) {
+        classification.requirementIds?.forEach((id) => set.add(id));
+      }
+    }
+    return set;
+  }, [share]);
 
   const activeGroup = activeElementId
     ? grouped.find((group) => group.element.id === activeElementId) ?? null
@@ -167,6 +193,11 @@ export default function PublicSharePage() {
     };
   });
 
+  const activeRequirements = activeGroup ? requirementsForElement(activeGroup.element.id) : [];
+  const activeCompleted = activeGroup
+    ? completedRequirementsForElement(activeGroup.evidence, activeGroup.element.id)
+    : new Set<string>();
+
   return (
     <>
       <AthShell
@@ -176,50 +207,75 @@ export default function PublicSharePage() {
         back={activeGroup ? { onClick: () => setActiveElementId(null) } : undefined}
       >
         {activeGroup ? (
-          <ElementDetail
-            elementId={activeGroup.element.id}
-            name={activeGroup.element.officialName}
-            category={activeGroup.element.category}
-            description={activeGroup.element.description}
-            supports={ELEMENT_GUIDANCE[activeGroup.element.id]?.supports ?? []}
-            crumbs={[{ label: "ملف الأداء", tap: { onClick: () => setActiveElementId(null) } }, { label: "عناصر التقييم", tap: { onClick: () => setActiveElementId(null) } }]}
-            evidence={activeGroup.evidence.map((item) => ({
-              id: item.id,
-              title: item.title,
-              description: item.description,
-              fileCount: item.attachments.length,
-              view: {
-                onClick: () => openSpecificAttachment(item, Math.max(0, item.attachments.findIndex((entry) => entry.driveFileId))),
-                disabled: !item.attachments.some((entry) => entry.driveFileId),
-              },
-              extra: (
-                <>
-                  {item.impact ? <div className="ath-impact">{item.impact}</div> : null}
-                  {item.attachments.length > 1 ? (
-                    <div className="ath-file-links no-print">
-                      {item.attachments.map((attachment, index) =>
-                        attachment.driveFileId ? (
-                          <button type="button" key={`${item.id}-${index}`} onClick={() => openSpecificAttachment(item, index)}>
-                            الملف {index + 1}
-                          </button>
-                        ) : null
-                      )}
-                    </div>
-                  ) : null}
-                </>
-              ),
-            }))}
-          />
+          <>
+            <ElementDetail
+              elementId={activeGroup.element.id}
+              name={activeGroup.element.officialName}
+              category={activeGroup.element.category}
+              description={activeGroup.element.description}
+              supports={ELEMENT_GUIDANCE[activeGroup.element.id]?.supports ?? []}
+              crumbs={[{ label: "ملف الأداء", tap: { onClick: () => setActiveElementId(null) } }, { label: "عناصر التقييم", tap: { onClick: () => setActiveElementId(null) } }]}
+              evidence={activeGroup.evidence.map((item) => ({
+                id: item.id,
+                title: item.title,
+                description: item.description,
+                fileCount: item.attachments.length,
+                view: {
+                  onClick: () => openSpecificAttachment(item, Math.max(0, item.attachments.findIndex((entry) => entry.driveFileId))),
+                  disabled: !item.attachments.some((entry) => entry.driveFileId),
+                },
+                extra: (
+                  <>
+                    {item.impact ? <div className="ath-impact">{item.impact}</div> : null}
+                    {item.attachments.length > 1 ? (
+                      <div className="ath-file-links no-print">
+                        {item.attachments.map((attachment, index) =>
+                          attachment.driveFileId ? (
+                            <button type="button" key={`${item.id}-${index}`} onClick={() => openSpecificAttachment(item, index)}>الملف {index + 1}</button>
+                          ) : null
+                        )}
+                      </div>
+                    ) : null}
+                  </>
+                ),
+              }))}
+            />
+
+            {activeRequirements.length ? (
+              <Panel
+                icon={<Glyph name="bars" size={22} />}
+                title="بنود المتابعة الإلزامية"
+                sub={`${activeCompleted.size} من ${activeRequirements.length} بنود موثقة`}
+              >
+                <div className="ath-stack">
+                  {activeRequirements.map((requirement) => {
+                    const done = activeCompleted.has(requirement.id);
+                    return (
+                      <div className="ath-file-row" key={requirement.id}>
+                        <span className="ic"><Glyph name={done ? "check" : "empty"} size={19} /></span>
+                        <div className="nm"><strong>{requirement.label}</strong><span>{done ? "موثق بشاهد معتمد" : "غير موثق في المشاركة الحالية"}</span></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Panel>
+            ) : null}
+          </>
         ) : (
           <>
             <PortfolioHero
               year={share.academicYear}
-              name={share.ownerDisplayName}
+              name={share.professionalProfile?.fullName || share.ownerDisplayName}
               evidenceCount={share.evidence.length}
               covered={covered}
               total={total}
               browse={{ onClick: () => document.getElementById("approved-evidence")?.scrollIntoView({ behavior: "smooth" }) }}
               print={{ onClick: () => window.print() }}
+            />
+
+            <ProfessionalIdentityCard
+              profile={share.professionalProfile}
+              fallbackName={share.ownerDisplayName}
             />
 
             <StatStrip
@@ -229,11 +285,15 @@ export default function PublicSharePage() {
               total={total}
             />
 
-            <SectionHead
-              icon={<Glyph name="bars" />}
-              title="عناصر التقييم"
-              side={<CountChip total={total} />}
-            />
+            <Panel
+              icon={<Glyph name="bars" size={22} />}
+              title="اكتمال بنود المتابعة الإلزامية"
+              sub={`${completedRequirementIds.size} من ${MANDATORY_REQUIREMENT_COUNT} بندًا موثقًا`}
+            >
+              <p className="ath-fine">يُحتسب البند عندما يكون مرتبطًا بشاهد معتمد ومؤكد من صاحبة الملف.</p>
+            </Panel>
+
+            <SectionHead icon={<Glyph name="bars" />} title="عناصر التقييم" side={<CountChip total={total} />} />
             <ElementGrid
               elements={elementSummaries}
               tapFor={(id) => ({ onClick: () => { setActiveElementId(id); window.scrollTo({ top: 0 }); } })}
@@ -257,10 +317,7 @@ export default function PublicSharePage() {
         <div className="share-viewer-backdrop no-print" onClick={() => setViewer(null)}>
           <section className="share-viewer" onClick={(event) => event.stopPropagation()}>
             <header className="share-viewer-head">
-              <div>
-                <span className="eyebrow">معاينة الشاهد</span>
-                <strong>{viewer.title}</strong>
-              </div>
+              <div><span className="eyebrow">معاينة الشاهد</span><strong>{viewer.title}</strong></div>
               <button type="button" onClick={() => setViewer(null)} aria-label="إغلاق">×</button>
             </header>
             <iframe src={viewerUrl(viewer.driveFileId)} title={viewer.title} allow="autoplay" />

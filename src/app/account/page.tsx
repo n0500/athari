@@ -11,6 +11,7 @@ import { getStoredDriveToken, logout } from "@/lib/auth";
 import { requireAuth } from "@/lib/firebase";
 import { cleanupDuplicateEvidence } from "@/lib/firestore";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
+import { MANDATORY_REQUIREMENT_COUNT } from "@/data/mandatory-requirements";
 
 type PanelKey =
   | "profile"
@@ -93,9 +94,9 @@ export default function AccountPage() {
     art: string;
     tone: "lav" | "sky" | "cream" | "pink" | "mint";
   }> = [
-    { key: "profile", title: "بيانات الملف المهني", subtitle: "الحساب المتصل", art: "people", tone: "lav" },
-    { key: "framework", title: "السنة وإطار الأداء", subtitle: `${year} · ${elementCount} عنصرًا`, art: "planner", tone: "sky" },
-    { key: "privacy", title: "الخصوصية والمشاركة", subtitle: "حالة Google Drive والمشاركة", art: "clipboard", tone: "mint" },
+    { key: "profile", title: "الهوية المهنية", subtitle: "بياناتك المهنية ونبذتك المختصرة", art: "people", tone: "lav" },
+    { key: "framework", title: "السنة وإطار الأداء", subtitle: `${year} · ${elementCount} عنصرًا · ${MANDATORY_REQUIREMENT_COUNT} بند متابعة`, art: "planner", tone: "sky" },
+    { key: "privacy", title: "الخصوصية والمشاركة", subtitle: "Google Drive ومشاركة ملف الأداء", art: "clipboard", tone: "mint" },
     { key: "maintenance", title: "تنظيف المحاولات المكررة", subtitle: "أرشفة آمنة دون حذف الأصول", art: "report", tone: "pink" },
     { key: "help", title: "المساعدة", subtitle: "المسار المختصر لاستخدام أثري", art: "bulb", tone: "cream" },
   ];
@@ -133,13 +134,15 @@ export default function AccountPage() {
                     <strong>حساب Google المستخدم في أثري</strong>
                     <span>{displayName}</span>
                     <span dir="ltr" style={{ textAlign: "right" }}>{email}</span>
+                    <span>تُعرض في مشاركة ملف الأداء البيانات المهنية التي تختارين حفظها فقط، ولا يظهر البريد أو رقم الجوال.</span>
+                    <Link className="ath-btn primary fit" href="/profile"><Glyph name="user" size={17} /> تعديل الهوية المهنية</Link>
                   </>
                 ) : null}
 
                 {entry.key === "framework" ? (
                   <>
                     <strong>العام الدراسي {year}</strong>
-                    <span>تُصنَّف الشواهد وفق إطار تقييم أداء المعلم الرسمي ({elementCount} عنصرًا).</span>
+                    <span>تُصنَّف الشواهد وفق إطار تقييم أداء المعلم الرسمي ({elementCount} عنصرًا)، مع متابعة {MANDATORY_REQUIREMENT_COUNT} بندًا إلزاميًا مرتبطة بهذه العناصر.</span>
                     <Link className="ath-link" href="/preview">معاينة ملف الأداء</Link>
                   </>
                 ) : null}
@@ -147,9 +150,10 @@ export default function AccountPage() {
                 {entry.key === "privacy" ? (
                   <>
                     <strong>الملفات الأصلية في Google Drive الخاص بك</strong>
-                    <span>يعرض رابط المشاركة الشواهد المعتمدة فقط دون الوصول إلى بقية ملفاتك.</span>
+                    <span>يمكن رفع ملفات جديدة إلى أثري، أو ربط ملف أو مجلد من Google Drive. الملفات المرتبطة تبقى في موقعها الأصلي.</span>
+                    <span>يعرض رابط المشاركة الشواهد المعتمدة فقط دون الوصول إلى بقية ملفاتك أو المجلد كاملًا.</span>
                     <small>
-                      حالة Google Drive: {getStoredDriveToken() ? "متصل" : "يُطلب الربط عند الحاجة"}
+                      حالة Google Drive: {getStoredDriveToken() ? "متصل" : "يُطلب تسجيل Google عند الحاجة"}
                     </small>
                     <Link className="ath-link" href="/portfolio?share=1">إدارة مشاركة ملف الأداء</Link>
                   </>
@@ -170,8 +174,9 @@ export default function AccountPage() {
                 {entry.key === "help" ? (
                   <>
                     <ol>
-                      <li>أضيفي ملفًا أو أكثر للشاهد نفسه.</li>
-                      <li>راجعي البيانات والتصنيف المقترح.</li>
+                      <li>أكملي الهوية المهنية مرة واحدة.</li>
+                      <li>أضيفي شاهدًا من الجهاز أو Google Drive.</li>
+                      <li>راجعي العنصر وبنود المتابعة التي يثبتها الشاهد.</li>
                       <li>اعتمدي الشاهد.</li>
                       <li>عايني ملف الأداء أو شاركيه.</li>
                     </ol>

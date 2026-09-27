@@ -12,7 +12,18 @@ import {
 import { Scene } from "@/components/athari-ui/Art";
 import { requireAuth } from "@/lib/firebase";
 import { ensureDriveAccessToken } from "@/lib/auth";
-import { ensureAthariInbox, uploadEvidenceToDrive } from "@/lib/drive";
+import {
+  downloadDriveFileForAnalysis,
+  driveItemIsSupported,
+  ensureAthariInbox,
+  getDriveFile,
+  GOOGLE_FOLDER_MIME,
+  listDriveFolderFiles,
+  uploadEvidenceToDrive,
+  type DriveFile,
+} from "@/lib/drive";
+import { pickDriveItem } from "@/lib/drivePicker";
+import { saveEvidenceDriveSource } from "@/lib/driveSource";
 import {
   attachDriveFiles,
   computeEvidenceBundleHash,
@@ -28,7 +39,8 @@ import {
   setEvidenceContentHash,
 } from "@/lib/firestore";
 import { analyzeEvidence } from "@/lib/ai";
-import { EvidenceAttachment } from "@/types/athari";
+import { requirementsForElement } from "@/data/mandatory-requirements";
+import { DriveSourceLink, EvidenceAttachment } from "@/types/athari";
 import { InfoTip } from "@/components/InfoTip";
 
 const MAX_FILES = 8;
@@ -80,24 +92,50 @@ function legacyAttachmentFromRecord(record: {
 export default function NewEvidencePage() {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
+  const [linkedDriveItems, setLinkedDriveItems] = useState<DriveFile[]>([]);
+  const [linkedSource, setLinkedSource] = useState<DriveSourceLink | null>(null);
+  const [sourceLabel, setSourceLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const academicYear =
     process.env.NEXT_PUBLIC_ATHARI_ACADEMIC_YEAR || "1448هـ";
 
+  const isDriveLinked = linkedDriveItems.length > 0;
   const totalBytes = useMemo(
     () => files.reduce((sum, file) => sum + file.size, 0),
     [files]
   );
 
-  function chooseFiles(list: FileList | null) {
+  function resetMessages() {
     setMessage("");
     setIsError(false);
+  }
 
+  function validateFiles(selected: File[]) {
+    if (selected.length > MAX_FILES) {
+      throw new Error(`الحد الأعلى ${MAX_FILES} ملفات للشاهد الواحد.`);
+    }
+    const oversized = selected.find((file) => file.size > MAX_FILE_BYTES);
+    if (oversized) throw new Error(`الملف «${oversized.name}» أكبر من 10 MB.`);
+    const unsupported = selected.find((file) => !isAccepted(file));
+    if (unsupported) {
+      throw new Error("الصيغ المدعومة: PDF، وصور JPG/PNG/WebP، وملفات Word DOCX.");
+    }
+    const total = selected.reduce((sum, file) => sum + file.size, 0);
+    if (total > MAX_TOTAL_BYTES) {
+      throw new Error("إجمالي ملفات الشاهد يجب ألا يتجاوز 30 MB.");
+    }
+  }
+
+  function chooseFiles(list: FileList | null) {
+    resetMessages();
     const selected = Array.from(list ?? []);
     if (!selected.length) {
       setFiles([]);
+      setLinkedDriveItems([]);
+      setLinkedSource(null);
+      setSourceLabel("");
       return;
     }
 
@@ -111,50 +149,115 @@ export default function NewEvidencePage() {
         ) === index
     );
 
-    if (unique.length > MAX_FILES) {
+    try {
+      validateFiles(unique);
+      setFiles(unique);
+      setLinkedDriveItems([]);
+      setLinkedSource(null);
+      setSourceLabel("من الجهاز");
+    } catch (error) {
       setFiles([]);
-      setMessage(`الحد الأعلى ${MAX_FILES} ملفات للشاهد الواحد.`);
+      setLinkedDriveItems([]);
+      setLinkedSource(null);
+      setSourceLabel("");
+      setMessage(error instanceof Error ? error.message : "تعذر اختيار الملفات.");
       setIsError(true);
-      return;
     }
+  }
 
-    const oversized = unique.find((file) => file.size > MAX_FILE_BYTES);
-    if (oversized) {
-      setFiles([]);
-      setMessage(`الملف «${oversized.name}» أكبر من 10 MB.`);
+  async function chooseFromDrive() {
+    try {
+      setBusy(true);
+      resetMessages();
+      setMessage("جاري فتح Google Drive…");
+      const token = await ensureDriveAccessToken();
+      const picked = await pickDriveItem(token);
+      if (!picked) {
+        setMessage("");
+        return;
+      }
+
+      let items: DriveFile[] = [];
+      let source: DriveSourceLink;
+      if (picked.mimeType === GOOGLE_FOLDER_MIME) {
+        const folder = await getDriveFile(token, picked.id);
+        source = {
+          kind: "folder",
+          id: folder.id,
+          name: folder.name || picked.name,
+          ...(folder.webViewLink ? { webViewLink: folder.webViewLink } : {}),
+        };
+        const folderItems = await listDriveFolderFiles(token, picked.id);
+        items = folderItems.filter(driveItemIsSupported);
+        if (!items.length) {
+          throw new Error("لا يحتوي المجلد على ملفات مدعومة للتحليل.");
+        }
+        if (items.length > MAX_FILES) {
+          throw new Error(`يحتوي المجلد على أكثر من ${MAX_FILES} ملفات مدعومة. اختاري مجلدًا أصغر أو ارفعي الملفات على أكثر من شاهد.`);
+        }
+        setMessage(`جاري تجهيز ملفات المجلد «${picked.name}»…`);
+      } else {
+        const item = await getDriveFile(token, picked.id);
+        source = {
+          kind: "file",
+          id: item.id,
+          name: item.name,
+          ...(item.webViewLink ? { webViewLink: item.webViewLink } : {}),
+        };
+        if (!driveItemIsSupported(item)) {
+          throw new Error("هذا النوع من الملفات غير مدعوم للتحليل في أثري.");
+        }
+        items = [item];
+        setMessage(`جاري تجهيز «${item.name}»…`);
+      }
+
+      const downloaded: File[] = [];
+      for (const item of items) {
+        downloaded.push(await downloadDriveFileForAnalysis(token, item));
+      }
+      validateFiles(downloaded);
+
+      setFiles(downloaded);
+      setLinkedDriveItems(items);
+      setLinkedSource(source);
+      setSourceLabel(
+        picked.mimeType === GOOGLE_FOLDER_MIME
+          ? `مجلد Google Drive: ${picked.name}`
+          : "ملف مرتبط من Google Drive"
+      );
+      setMessage(
+        picked.mimeType === GOOGLE_FOLDER_MIME
+          ? `تم ربط المجلد «${picked.name}» · ${items.length} ${items.length === 1 ? "ملف" : "ملفات"}. لن تُنقل الأصول من مكانها.`
+          : "تم ربط الملف من Google Drive ولن يُنقل من مكانه."
+      );
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : "UNKNOWN";
       setIsError(true);
-      return;
+      if (raw === "PICKER_NOT_CONFIGURED" || raw === "PICKER_UNAVAILABLE") {
+        setMessage("تعذر فتح اختيار Google Drive. يلزم تفعيل Google Picker API للمشروع مرة واحدة.");
+      } else if (raw === "DRIVE_RECONNECT_REQUIRED") {
+        setMessage("يرجى تسجيل الدخول إلى Google ثم إعادة اختيار الملف أو المجلد.");
+      } else {
+        setMessage(raw.startsWith("DRIVE_") ? "تعذر قراءة الملف أو المجلد من Google Drive." : raw);
+      }
+    } finally {
+      setBusy(false);
     }
-
-    const unsupported = unique.find((file) => !isAccepted(file));
-    if (unsupported) {
-      setFiles([]);
-      setMessage("الصيغ المدعومة: PDF، وصور JPG/PNG/WebP، وملفات Word DOCX.");
-      setIsError(true);
-      return;
-    }
-
-    const total = unique.reduce((sum, file) => sum + file.size, 0);
-    if (total > MAX_TOTAL_BYTES) {
-      setFiles([]);
-      setMessage("إجمالي ملفات الشاهد يجب ألا يتجاوز 30 MB.");
-      setIsError(true);
-      return;
-    }
-
-    setFiles(unique);
   }
 
   function removeFile(index: number) {
     setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
-    setMessage("");
-    setIsError(false);
+    if (linkedDriveItems.length) {
+      setLinkedDriveItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    }
+    resetMessages();
   }
 
   async function processEvidence() {
     if (!files.length) return;
 
     let evidenceId = "";
+    let stage: "prepare" | "drive" | "analysis" = "prepare";
 
     try {
       setBusy(true);
@@ -166,8 +269,6 @@ export default function NewEvidencePage() {
         return;
       }
 
-      // Request Google Drive access immediately from the button tap so
-      // mobile browsers can open Google sign-in reliably, then continue.
       setMessage("جاري تجهيز حفظ الشاهد…");
       let driveToken = "";
       try {
@@ -216,95 +317,115 @@ export default function NewEvidencePage() {
         });
       }
 
-      const existingAttachments = duplicate?.attachments?.length
-        ? duplicate.attachments
-        : duplicate && files.length === 1
-        ? ([legacyAttachmentFromRecord(duplicate)].filter(Boolean) as EvidenceAttachment[])
-        : [];
+      stage = "drive";
 
-      // Pair each file with what is already recorded (name + size + hash, used once).
-      const prior = matchPriorAttachments(files, fileHashes, existingAttachments);
-      const ids = files.map((_, index) => prior[index]?.attachmentId ?? newAttachmentId());
-      const progress: (EvidenceAttachment | undefined)[] = files.map((_, index) =>
-        prior[index]?.driveFileId ? { ...prior[index]!, attachmentId: ids[index] } : undefined
-      );
+      if (isDriveLinked) {
+        const linkedAttachments: EvidenceAttachment[] = files.map((file, index) => {
+          const source = linkedDriveItems[index];
+          return {
+            attachmentId: newAttachmentId(),
+            originalFileName: source?.name || file.name,
+            mimeType: source?.mimeType || file.type || "application/octet-stream",
+            fileSize: file.size,
+            ...(fileHashes[index] ? { contentHash: fileHashes[index] } : {}),
+            ...(source?.id ? { driveFileId: source.id } : {}),
+            ...(source?.webViewLink ? { driveWebViewLink: source.webViewLink } : {}),
+            ...(source?.parents?.[0] ? { driveParentFolderId: source.parents[0] } : {}),
+            sourceKind: "drive_link",
+          };
+        });
+        await attachDriveFiles(evidenceId, linkedAttachments);
+        if (linkedSource) await saveEvidenceDriveSource(evidenceId, linkedSource);
+      } else {
+        const existingAttachments = duplicate?.attachments?.length
+          ? duplicate.attachments
+          : duplicate && files.length === 1
+          ? ([legacyAttachmentFromRecord(duplicate)].filter(Boolean) as EvidenceAttachment[])
+          : [];
 
-      // Pending entries keep the file's metadata and hash (no Drive id yet).
-      const snapshot = () =>
-        files.map(
-          (file, index): EvidenceAttachment =>
-            progress[index] ?? {
-              attachmentId: ids[index],
-              originalFileName: file.name,
-              mimeType: file.type || "application/octet-stream",
-              fileSize: file.size,
-              ...(fileHashes[index] ? { contentHash: fileHashes[index] } : {}),
-            }
+        const prior = matchPriorAttachments(files, fileHashes, existingAttachments);
+        const ids = files.map((_, index) => prior[index]?.attachmentId ?? newAttachmentId());
+        const progress: (EvidenceAttachment | undefined)[] = files.map((_, index) =>
+          prior[index]?.driveFileId ? { ...prior[index]!, attachmentId: ids[index] } : undefined
         );
 
-      let inboxId = "";
-
-      for (let index = 0; index < files.length; index += 1) {
-        if (progress[index]) continue; // already in Drive and recorded
-
-        const file = files[index];
-        if (!inboxId) {
-          setMessage(
-            files.length > 1
-              ? `جاري حفظ ${files.length} ملفات في Google Drive…`
-              : "جاري حفظ الملف في Google Drive…"
+        const snapshot = () =>
+          files.map(
+            (file, index): EvidenceAttachment =>
+              progress[index] ?? {
+                attachmentId: ids[index],
+                originalFileName: file.name,
+                mimeType: file.type || "application/octet-stream",
+                fileSize: file.size,
+                ...(fileHashes[index] ? { contentHash: fileHashes[index] } : {}),
+                sourceKind: "athari_upload",
+              }
           );
-          const { inbox } = await ensureAthariInbox(driveToken, academicYear);
-          inboxId = inbox.id;
+
+        let inboxId = "";
+        for (let index = 0; index < files.length; index += 1) {
+          if (progress[index]) continue;
+          const file = files[index];
+          if (!inboxId) {
+            setMessage(
+              files.length > 1
+                ? `جاري حفظ ${files.length} ملفات في Google Drive…`
+                : "جاري حفظ الملف في Google Drive…"
+            );
+            const { inbox } = await ensureAthariInbox(driveToken, academicYear);
+            inboxId = inbox.id;
+          }
+
+          const saved = await uploadEvidenceToDrive(driveToken, file, inboxId);
+          progress[index] = {
+            attachmentId: ids[index],
+            originalFileName: file.name,
+            mimeType: file.type || "application/octet-stream",
+            fileSize: file.size,
+            contentHash: fileHashes[index],
+            driveFileId: saved.id,
+            ...(saved.webViewLink ? { driveWebViewLink: saved.webViewLink } : {}),
+            driveParentFolderId: inboxId,
+            sourceKind: "athari_upload",
+          };
+          await saveAttachmentProgress(evidenceId, snapshot());
         }
 
-        const saved = await uploadEvidenceToDrive(driveToken, file, inboxId);
-        progress[index] = {
-          attachmentId: ids[index],
-          originalFileName: file.name,
-          mimeType: file.type || "application/octet-stream",
-          fileSize: file.size,
-          contentHash: fileHashes[index],
-          driveFileId: saved.id,
-          ...(saved.webViewLink ? { driveWebViewLink: saved.webViewLink } : {}),
-          driveParentFolderId: inboxId,
-        };
-
-        // Record this file in Athari now, before uploading the next one.
-        await saveAttachmentProgress(evidenceId, snapshot());
+        const completed = progress.filter(Boolean) as EvidenceAttachment[];
+        await attachDriveFiles(evidenceId, completed);
       }
 
-      const completed = progress.filter(Boolean) as EvidenceAttachment[];
-      await attachDriveFiles(evidenceId, completed);
       await markAnalyzing(evidenceId);
-
+      stage = "analysis";
       setMessage("جاري تحليل الشاهد…");
 
-      const framework = await getActiveFrameworkElements();
+      const baseFramework = await getActiveFrameworkElements();
+      const framework = baseFramework.map((element) => ({
+        ...element,
+        requirements: requirementsForElement(element.id).map((requirement) => ({
+          id: requirement.id,
+          label: requirement.label,
+        })),
+      }));
       const analysis = await analyzeEvidence(files, framework);
       await saveAnalysis(evidenceId, analysis);
 
       router.push(`/evidence/review?id=${encodeURIComponent(evidenceId)}`);
     } catch (error) {
       const raw = error instanceof Error ? error.message : "UNKNOWN";
-      if (evidenceId) {
+      if (evidenceId && stage === "analysis") {
         await markAnalysisFailed(evidenceId, raw).catch(() => undefined);
       }
       setIsError(true);
 
       if (raw === "AI_FREE_LIMIT_REACHED") {
-        setMessage(
-          "اكتملت حصة التحليل لهذا اليوم. الملفات محفوظة ومسجلة، ولن تُرفع مرة أخرى عند إعادة المحاولة."
-        );
-      } else if (
-        raw === "DRIVE_SIGNIN_REQUIRED" ||
-        raw === "DRIVE_RECONNECT_REQUIRED"
-      ) {
+        setMessage("اكتملت حصة التحليل لهذا اليوم. الملفات محفوظة ومسجلة، ولن تُرفع مرة أخرى عند إعادة المحاولة.");
+      } else if (raw === "DRIVE_SIGNIN_REQUIRED" || raw === "DRIVE_RECONNECT_REQUIRED") {
         setMessage("يرجى تسجيل الدخول إلى Google لمتابعة حفظ الشاهد.");
+      } else if (stage === "drive") {
+        setMessage("تعذر حفظ بيانات الشاهد في Google Drive الآن. أعيدي المحاولة.");
       } else {
-        setMessage(
-          "تعذر إكمال العملية الآن. الملفات التي اكتمل رفعها مسجلة، ولن تُرفع مرة أخرى عند إعادة المحاولة."
-        );
+        setMessage("تعذر إكمال العملية الآن. أعيدي المحاولة دون تغيير الملفات.");
       }
     } finally {
       setBusy(false);
@@ -313,7 +434,6 @@ export default function NewEvidencePage() {
 
   return (
     <AthShell back={{ href: "/evidence" }} title="إضافة شاهد" subtitle="إضافة ملفات للإنجاز نفسه.">
-
       <div className="ath-steps" aria-label="مراحل إضافة الشاهد">
         <span className="on"><b>1</b>اختيار</span>
         <span className={busy ? "on" : ""}><b>2</b>تحليل</span>
@@ -321,8 +441,25 @@ export default function NewEvidencePage() {
       </div>
 
       <div className="v7-field-head">
-        <strong>ملفات الشاهد</strong>
-        <InfoTip text="يمكن إضافة أكثر من ملف للشاهد نفسه." />
+        <strong>مصدر الشاهد</strong>
+        <InfoTip text="يمكن رفع الملفات من الجهاز أو ربط ملف أو مجلد من Google Drive. الملفات المرتبطة تبقى في مكانها الأصلي." />
+      </div>
+
+      <div className="ath-actions" style={{ marginBottom: 12 }}>
+        <label className="ath-btn outline fit" style={{ cursor: "pointer" }}>
+          <Glyph name="upload" size={18} /> من الجهاز
+          <input
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp,.pdf,.docx"
+            onChange={(event) => chooseFiles(event.target.files)}
+            disabled={busy}
+            style={{ display: "none" }}
+          />
+        </label>
+        <button type="button" className="ath-btn outline fit" onClick={chooseFromDrive} disabled={busy}>
+          <Glyph name="folder" size={18} /> من Google Drive
+        </button>
       </div>
 
       <label className="ath-drop">
@@ -343,20 +480,20 @@ export default function NewEvidencePage() {
         <Panel
           icon={<Glyph name="folder" size={22} />}
           title={files.length === 1 ? "ملف واحد" : files.length === 2 ? "ملفان" : `${files.length} ملفات`}
-          sub={`${formatSize(totalBytes)} إجمالًا · تُحفظ شاهدًا واحدًا`}
+          sub={`${formatSize(totalBytes)} إجمالًا · ${sourceLabel || "شاهد واحد"}`}
         >
-          <div className="ath-stack">
+          {isDriveLinked ? (
+            <Notice>الملفات مرتبطة من Google Drive وتبقى في موقعها الأصلي. لا ينقلها أثري عند الاعتماد.</Notice>
+          ) : null}
+          <div className="ath-stack" style={{ marginTop: isDriveLinked ? 10 : 0 }}>
             {files.map((file, index) => (
-              <div className="ath-file-row" key={`${file.name}-${file.size}-${file.lastModified}`}>
+              <div className="ath-file-row" key={`${file.name}-${file.size}-${index}`}>
                 <span className="ic"><Glyph name="docOutline" size={18} /></span>
-                <div className="nm"><strong>{file.name}</strong><span>{formatSize(file.size)}</span></div>
-                <button
-                  type="button"
-                  className="ath-icon-btn"
-                  onClick={() => removeFile(index)}
-                  disabled={busy}
-                  aria-label={`إزالة ${file.name}`}
-                >
+                <div className="nm">
+                  <strong>{linkedDriveItems[index]?.name || file.name}</strong>
+                  <span>{formatSize(file.size)}{isDriveLinked ? " · مرتبط" : ""}</span>
+                </div>
+                <button type="button" className="ath-icon-btn" onClick={() => removeFile(index)} disabled={busy} aria-label={`إزالة ${file.name}`}>
                   <Glyph name="trash" size={17} />
                 </button>
               </div>
@@ -375,16 +512,10 @@ export default function NewEvidencePage() {
         <Notice tone={isError ? "error" : "info"}>{message}</Notice>
       ) : null}
 
-      <button
-        type="button"
-        className="ath-btn primary block"
-        onClick={processEvidence}
-        disabled={!files.length || busy}
-      >
+      <button type="button" className="ath-btn primary block" onClick={processEvidence} disabled={!files.length || busy}>
         <Glyph name="sparkle" />
         {busy ? "جاري الحفظ والتحليل…" : "حفظ وتحليل الشاهد"}
       </button>
-
     </AthShell>
   );
 }

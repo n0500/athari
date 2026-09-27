@@ -4,9 +4,16 @@ import type { ShareDrivePermission } from "@/lib/portfolioShare";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3";
 
-type DriveFile = {
+export const GOOGLE_FOLDER_MIME = "application/vnd.google-apps.folder";
+const GOOGLE_DOC = "application/vnd.google-apps.document";
+const GOOGLE_SHEET = "application/vnd.google-apps.spreadsheet";
+const GOOGLE_SLIDES = "application/vnd.google-apps.presentation";
+
+export type DriveFile = {
   id: string;
   name: string;
+  mimeType?: string;
+  size?: string;
   parents?: string[];
   webViewLink?: string;
 };
@@ -51,7 +58,7 @@ async function findFolder(
 
   const result = await driveJson<{ files: DriveFile[] }>(
     token,
-    `${DRIVE_API}/files?q=${encodeURIComponent(q)}&fields=files(id,name,parents)&pageSize=10`
+    `${DRIVE_API}/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,parents)&pageSize=10`
   );
 
   return result.files[0] ?? null;
@@ -64,13 +71,13 @@ async function createFolder(
 ): Promise<DriveFile> {
   return driveJson<DriveFile>(
     token,
-    `${DRIVE_API}/files?fields=id,name,parents`,
+    `${DRIVE_API}/files?fields=id,name,mimeType,parents`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
-        mimeType: "application/vnd.google-apps.folder",
+        mimeType: GOOGLE_FOLDER_MIME,
         parents: [parentId],
       }),
     }
@@ -135,7 +142,7 @@ export async function uploadEvidenceToDrive(
 
   return driveJson<DriveFile>(
     token,
-    `${DRIVE_UPLOAD}/files?uploadType=multipart&fields=id,name,parents,webViewLink`,
+    `${DRIVE_UPLOAD}/files?uploadType=multipart&fields=id,name,mimeType,parents,webViewLink`,
     {
       method: "POST",
       headers: {
@@ -146,14 +153,61 @@ export async function uploadEvidenceToDrive(
   );
 }
 
-async function getDriveFile(
+export async function getDriveFile(
   token: string,
   fileId: string
 ): Promise<DriveFile> {
   return driveJson<DriveFile>(
     token,
-    `${DRIVE_API}/files/${encodeURIComponent(fileId)}?fields=id,name,parents,webViewLink`
+    `${DRIVE_API}/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,size,parents,webViewLink`
   );
+}
+
+export function driveItemIsSupported(item: DriveFile) {
+  const mime = item.mimeType || "";
+  return [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    GOOGLE_DOC,
+    GOOGLE_SHEET,
+    GOOGLE_SLIDES,
+  ].includes(mime);
+}
+
+export async function listDriveFolderFiles(token: string, folderId: string) {
+  const q = [`'${escapeQuery(folderId)}' in parents`, "trashed = false"].join(" and ");
+  const result = await driveJson<{ files: DriveFile[] }>(
+    token,
+    `${DRIVE_API}/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,size,parents,webViewLink)&orderBy=name&pageSize=100`
+  );
+  return result.files.filter((item) => item.mimeType !== GOOGLE_FOLDER_MIME);
+}
+
+function exportedName(name: string) {
+  return /\.pdf$/i.test(name) ? name : `${name}.pdf`;
+}
+
+export async function downloadDriveFileForAnalysis(token: string, item: DriveFile) {
+  const mime = item.mimeType || "application/octet-stream";
+  const isGoogleNative = [GOOGLE_DOC, GOOGLE_SHEET, GOOGLE_SLIDES].includes(mime);
+  const url = isGoogleNative
+    ? `${DRIVE_API}/files/${encodeURIComponent(item.id)}/export?mimeType=${encodeURIComponent("application/pdf")}`
+    : `${DRIVE_API}/files/${encodeURIComponent(item.id)}?alt=media`;
+
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (response.status === 401) {
+    clearStoredDriveToken();
+    throw new Error("DRIVE_RECONNECT_REQUIRED");
+  }
+  if (!response.ok) throw new Error(`DRIVE_DOWNLOAD_${response.status}`);
+
+  const blob = await response.blob();
+  const fileMime = isGoogleNative ? "application/pdf" : mime;
+  const name = isGoogleNative ? exportedName(item.name) : item.name;
+  return new File([blob], name, { type: fileMime });
 }
 
 export async function moveDriveFile(
@@ -169,7 +223,7 @@ export async function moveDriveFile(
 
   const params = new URLSearchParams({
     addParents: toParentId,
-    fields: "id,name,parents,webViewLink",
+    fields: "id,name,mimeType,parents,webViewLink",
   });
 
   if (currentParents.length) {
@@ -250,7 +304,6 @@ export async function publishPortfolioFiles(
       createdNow.push(entry);
     }
   } catch (error) {
-    // Undo the permissions this call added before failing, then report the failure.
     await revokePortfolioPermissions(token, createdNow).catch(() => undefined);
     throw error;
   }
@@ -258,7 +311,6 @@ export async function publishPortfolioFiles(
   return published;
 }
 
-/** Permissions in `published` that were not part of the previous share. */
 export function newlyAddedPermissions(
   published: ShareDrivePermission[],
   previous: ShareDrivePermission[]
