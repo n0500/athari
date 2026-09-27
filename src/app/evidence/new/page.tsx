@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   AthShell,
@@ -17,19 +18,25 @@ import {
   driveItemIsSupported,
   ensureAthariInbox,
   getDriveFile,
-  GOOGLE_FOLDER_MIME,
-  listDriveFolderFiles,
   uploadEvidenceToDrive,
   type DriveFile,
 } from "@/lib/drive";
-import { pickDriveItem } from "@/lib/drivePicker";
+import { pickDriveFiles, pickDriveFolder } from "@/lib/drivePicker";
 import { saveEvidenceDriveSource } from "@/lib/driveSource";
+import {
+  getLinkedDriveFolders,
+  removeLinkedDriveFolder,
+  touchLinkedDriveFolder,
+  upsertLinkedDriveFolder,
+  type LinkedDriveFolder,
+} from "@/lib/linkedDriveFolders";
 import {
   attachDriveFiles,
   computeEvidenceBundleHash,
   createEvidenceDraft,
   findDuplicateEvidence,
   getActiveFrameworkElements,
+  listUserEvidence,
   markAnalyzing,
   markAnalysisFailed,
   matchPriorAttachments,
@@ -53,6 +60,8 @@ const ACCEPTED = [
   "image/webp",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
+
+type SourceMode = "standard" | "folder_batch";
 
 function isAccepted(file: File) {
   if (file.type && ACCEPTED.includes(file.type)) return true;
@@ -89,11 +98,28 @@ function legacyAttachmentFromRecord(record: {
   };
 }
 
+function driveErrorMessage(raw: string) {
+  if (raw === "PICKER_NOT_CONFIGURED" || raw === "PICKER_UNAVAILABLE") {
+    return "تعذر فتح اختيار Google Drive. تحققي من إعداد Google Picker ثم أعيدي المحاولة.";
+  }
+  if (raw === "PICKER_FOLDER_REQUIRED") {
+    return "اختاري مجلدًا من Google Drive.";
+  }
+  if (raw === "DRIVE_RECONNECT_REQUIRED") {
+    return "يرجى تسجيل الدخول إلى Google ثم إعادة المحاولة.";
+  }
+  return raw.startsWith("DRIVE_")
+    ? "تعذر قراءة الملف أو المجلد من Google Drive."
+    : raw;
+}
+
 export default function NewEvidencePage() {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [linkedDriveItems, setLinkedDriveItems] = useState<DriveFile[]>([]);
   const [linkedSource, setLinkedSource] = useState<DriveSourceLink | null>(null);
+  const [linkedFolders, setLinkedFolders] = useState<LinkedDriveFolder[]>([]);
+  const [sourceMode, setSourceMode] = useState<SourceMode>("standard");
   const [sourceLabel, setSourceLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -107,14 +133,36 @@ export default function NewEvidencePage() {
     [files]
   );
 
+  useEffect(() => {
+    return onAuthStateChanged(requireAuth(), async (user) => {
+      if (!user) {
+        setLinkedFolders([]);
+        return;
+      }
+      try {
+        setLinkedFolders(await getLinkedDriveFolders(user.uid));
+      } catch {
+        // Folder shortcuts are a convenience; evidence upload still works without them.
+      }
+    });
+  }, []);
+
   function resetMessages() {
     setMessage("");
     setIsError(false);
   }
 
+  function clearSelection() {
+    setFiles([]);
+    setLinkedDriveItems([]);
+    setLinkedSource(null);
+    setSourceLabel("");
+    setSourceMode("standard");
+  }
+
   function validateFiles(selected: File[]) {
     if (selected.length > MAX_FILES) {
-      throw new Error(`الحد الأعلى ${MAX_FILES} ملفات للشاهد الواحد.`);
+      throw new Error(`الحد الأعلى ${MAX_FILES} ملفات في العملية الواحدة.`);
     }
     const oversized = selected.find((file) => file.size > MAX_FILE_BYTES);
     if (oversized) throw new Error(`الملف «${oversized.name}» أكبر من 10 MB.`);
@@ -124,7 +172,7 @@ export default function NewEvidencePage() {
     }
     const total = selected.reduce((sum, file) => sum + file.size, 0);
     if (total > MAX_TOTAL_BYTES) {
-      throw new Error("إجمالي ملفات الشاهد يجب ألا يتجاوز 30 MB.");
+      throw new Error("إجمالي الملفات في العملية الواحدة يجب ألا يتجاوز 30 MB.");
     }
   }
 
@@ -132,10 +180,7 @@ export default function NewEvidencePage() {
     resetMessages();
     const selected = Array.from(list ?? []);
     if (!selected.length) {
-      setFiles([]);
-      setLinkedDriveItems([]);
-      setLinkedSource(null);
-      setSourceLabel("");
+      clearSelection();
       return;
     }
 
@@ -155,14 +200,30 @@ export default function NewEvidencePage() {
       setLinkedDriveItems([]);
       setLinkedSource(null);
       setSourceLabel("من الجهاز");
+      setSourceMode("standard");
     } catch (error) {
-      setFiles([]);
-      setLinkedDriveItems([]);
-      setLinkedSource(null);
-      setSourceLabel("");
+      clearSelection();
       setMessage(error instanceof Error ? error.message : "تعذر اختيار الملفات.");
       setIsError(true);
     }
+  }
+
+  async function downloadPickedItems(token: string, picked: Array<{ id: string }>) {
+    if (picked.length > MAX_FILES) {
+      throw new Error(`اختاري حتى ${MAX_FILES} ملفات في كل مرة.`);
+    }
+    const items: DriveFile[] = [];
+    const downloaded: File[] = [];
+    for (const pickedItem of picked) {
+      const item = await getDriveFile(token, pickedItem.id);
+      if (!driveItemIsSupported(item)) {
+        throw new Error(`الملف «${item.name}» من نوع غير مدعوم للتحليل.`);
+      }
+      items.push(item);
+      downloaded.push(await downloadDriveFileForAnalysis(token, item));
+    }
+    validateFiles(downloaded);
+    return { items, downloaded };
   }
 
   async function chooseFromDrive() {
@@ -171,75 +232,165 @@ export default function NewEvidencePage() {
       resetMessages();
       setMessage("جاري فتح Google Drive…");
       const token = await ensureDriveAccessToken();
-      const picked = await pickDriveItem(token);
-      if (!picked) {
+      const picked = await pickDriveFiles(token, {
+        multiple: true,
+        title: "اختيار ملف أو أكثر من Google Drive",
+      });
+      if (!picked.length) {
         setMessage("");
         return;
       }
 
-      let items: DriveFile[] = [];
-      let source: DriveSourceLink;
-      if (picked.mimeType === GOOGLE_FOLDER_MIME) {
-        const folder = await getDriveFile(token, picked.id);
-        source = {
-          kind: "folder",
-          id: folder.id,
-          name: folder.name || picked.name,
-          ...(folder.webViewLink ? { webViewLink: folder.webViewLink } : {}),
-        };
-        const folderItems = await listDriveFolderFiles(token, picked.id);
-        items = folderItems.filter(driveItemIsSupported);
-        if (!items.length) {
-          throw new Error("لا يحتوي المجلد على ملفات مدعومة للتحليل.");
-        }
-        if (items.length > MAX_FILES) {
-          throw new Error(`يحتوي المجلد على أكثر من ${MAX_FILES} ملفات مدعومة. اختاري مجلدًا أصغر أو ارفعي الملفات على أكثر من شاهد.`);
-        }
-        setMessage(`جاري تجهيز ملفات المجلد «${picked.name}»…`);
-      } else {
-        const item = await getDriveFile(token, picked.id);
-        source = {
-          kind: "file",
-          id: item.id,
-          name: item.name,
-          ...(item.webViewLink ? { webViewLink: item.webViewLink } : {}),
-        };
-        if (!driveItemIsSupported(item)) {
-          throw new Error("هذا النوع من الملفات غير مدعوم للتحليل في أثري.");
-        }
-        items = [item];
-        setMessage(`جاري تجهيز «${item.name}»…`);
-      }
-
-      const downloaded: File[] = [];
-      for (const item of items) {
-        downloaded.push(await downloadDriveFileForAnalysis(token, item));
-      }
-      validateFiles(downloaded);
-
+      setMessage("جاري تجهيز الملفات المختارة…");
+      const { items, downloaded } = await downloadPickedItems(token, picked);
       setFiles(downloaded);
       setLinkedDriveItems(items);
-      setLinkedSource(source);
-      setSourceLabel(
-        picked.mimeType === GOOGLE_FOLDER_MIME
-          ? `مجلد Google Drive: ${picked.name}`
-          : "ملف مرتبط من Google Drive"
+      setLinkedSource(
+        items.length === 1
+          ? {
+              kind: "file",
+              id: items[0].id,
+              name: items[0].name,
+              ...(items[0].webViewLink ? { webViewLink: items[0].webViewLink } : {}),
+            }
+          : null
       );
+      setSourceMode("standard");
+      setSourceLabel("ملف مرتبط من Google Drive");
       setMessage(
-        picked.mimeType === GOOGLE_FOLDER_MIME
-          ? `تم ربط المجلد «${picked.name}» · ${items.length} ${items.length === 1 ? "ملف" : "ملفات"}. لن تُنقل الأصول من مكانها.`
-          : "تم ربط الملف من Google Drive ولن يُنقل من مكانه."
+        items.length === 1
+          ? "تم ربط الملف من Google Drive ولن يُنقل من مكانه."
+          : `تم اختيار ${items.length} ملفات من Google Drive كشاهد واحد.`
       );
     } catch (error) {
       const raw = error instanceof Error ? error.message : "UNKNOWN";
       setIsError(true);
-      if (raw === "PICKER_NOT_CONFIGURED" || raw === "PICKER_UNAVAILABLE") {
-        setMessage("تعذر فتح اختيار Google Drive. يلزم تفعيل Google Picker API للمشروع مرة واحدة.");
-      } else if (raw === "DRIVE_RECONNECT_REQUIRED") {
-        setMessage("يرجى تسجيل الدخول إلى Google ثم إعادة اختيار الملف أو المجلد.");
-      } else {
-        setMessage(raw.startsWith("DRIVE_") ? "تعذر قراءة الملف أو المجلد من Google Drive." : raw);
+      setMessage(driveErrorMessage(raw));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function linkNewFolder() {
+    const user = requireAuth().currentUser;
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    try {
+      setBusy(true);
+      resetMessages();
+      setMessage("جاري فتح Google Drive لاختيار المجلد…");
+      const token = await ensureDriveAccessToken();
+      const picked = await pickDriveFolder(token);
+      if (!picked) {
+        setMessage("");
+        return;
       }
+      const folder = await getDriveFile(token, picked.id);
+      const next = await upsertLinkedDriveFolder(user.uid, {
+        id: folder.id,
+        name: folder.name || picked.name,
+        ...(folder.webViewLink ? { webViewLink: folder.webViewLink } : {}),
+      });
+      setLinkedFolders(next);
+      setMessage(
+        `تم ربط مجلد «${folder.name || picked.name}». عند إضافة شهادات جديدة استخدمي زر «تحديث» بجانبه.`
+      );
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : "UNKNOWN";
+      setIsError(true);
+      setMessage(driveErrorMessage(raw));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshFolder(folder: LinkedDriveFolder) {
+    const user = requireAuth().currentUser;
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    try {
+      setBusy(true);
+      resetMessages();
+      setMessage(`جاري فتح مجلد «${folder.name}»…`);
+      const token = await ensureDriveAccessToken();
+      const picked = await pickDriveFiles(token, {
+        parentId: folder.id,
+        multiple: true,
+        title: `اختاري الشهادات الجديدة من «${folder.name}»`,
+      });
+      if (!picked.length) {
+        setMessage("");
+        return;
+      }
+
+      const existing = await listUserEvidence(user.uid, { includeArchived: true });
+      const usedDriveIds = new Set(
+        existing.flatMap((item) => [
+          ...(item.driveFileId ? [item.driveFileId] : []),
+          ...(item.attachments ?? [])
+            .map((attachment) => attachment.driveFileId)
+            .filter((value): value is string => Boolean(value)),
+        ])
+      );
+      const fresh = picked.filter((item) => !usedDriveIds.has(item.id));
+      const skipped = picked.length - fresh.length;
+
+      if (!fresh.length) {
+        const next = await touchLinkedDriveFolder(user.uid, folder.id);
+        setLinkedFolders(next);
+        setMessage("الملفات التي اخترتها موجودة مسبقًا في أثري. لا يوجد جديد لإضافته.");
+        return;
+      }
+
+      setMessage(`جاري تجهيز ${fresh.length} ${fresh.length === 1 ? "شهادة" : "شهادات"} جديدة…`);
+      const { items, downloaded } = await downloadPickedItems(token, fresh);
+      const next = await touchLinkedDriveFolder(user.uid, folder.id);
+      setLinkedFolders(next);
+      setFiles(downloaded);
+      setLinkedDriveItems(items);
+      setLinkedSource({
+        kind: "folder",
+        id: folder.id,
+        name: folder.name,
+        ...(folder.webViewLink ? { webViewLink: folder.webViewLink } : {}),
+      });
+      setSourceMode("folder_batch");
+      setSourceLabel(`مجلد Google Drive: ${folder.name}`);
+      setMessage(
+        `${fresh.length} ${fresh.length === 1 ? "شهادة جديدة جاهزة" : "شهادات جديدة جاهزة"} للإضافة كشواهد مستقلة${
+          skipped ? ` · تم تجاهل ${skipped} مضافة مسبقًا` : ""
+        }.`
+      );
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : "UNKNOWN";
+      setIsError(true);
+      setMessage(driveErrorMessage(raw));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unlinkFolder(folder: LinkedDriveFolder) {
+    const user = requireAuth().currentUser;
+    if (!user) return;
+    if (!window.confirm(`إلغاء ربط مجلد «${folder.name}» من أثري؟ لن يُحذف أي ملف من Google Drive.`)) {
+      return;
+    }
+    try {
+      setBusy(true);
+      const next = await removeLinkedDriveFolder(user.uid, folder.id);
+      setLinkedFolders(next);
+      setMessage("أُلغي ربط المجلد، ولم يُحذف أي ملف من Google Drive.");
+      setIsError(false);
+    } catch {
+      setIsError(true);
+      setMessage("تعذر إلغاء ربط المجلد الآن.");
     } finally {
       setBusy(false);
     }
@@ -251,6 +402,97 @@ export default function NewEvidencePage() {
       setLinkedDriveItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
     }
     resetMessages();
+  }
+
+  async function frameworkForAnalysis() {
+    const baseFramework = await getActiveFrameworkElements();
+    return baseFramework.map((element) => ({
+      ...element,
+      requirements: requirementsForElement(element.id).map((requirement) => ({
+        id: requirement.id,
+        label: requirement.label,
+      })),
+    }));
+  }
+
+  async function processFolderBatch(user: User, driveToken: string) {
+    if (!linkedSource || linkedSource.kind !== "folder") {
+      throw new Error("FOLDER_SOURCE_REQUIRED");
+    }
+
+    const framework = await frameworkForAnalysis();
+    let completed = 0;
+
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
+      const source = linkedDriveItems[index];
+      if (!source?.id) continue;
+
+      setMessage(
+        files.length === 1
+          ? "جاري تحليل الشهادة الجديدة…"
+          : `جاري تحليل الشهادة ${index + 1} من ${files.length}…`
+      );
+
+      const { contentHash, fileHashes } = await computeEvidenceBundleHash([file]);
+      const duplicate = await findDuplicateEvidence({
+        uid: user.uid,
+        academicYear,
+        files: [file],
+        contentHash,
+      });
+
+      if (
+        duplicate &&
+        ["approved", "ready_for_review", "needs_info"].includes(duplicate.status)
+      ) {
+        continue;
+      }
+
+      const evidenceId = duplicate?.id ??
+        (await createEvidenceDraft({
+          ownerUid: user.uid,
+          academicYear,
+          files: [file],
+          contentHash,
+          fileHashes,
+        }));
+
+      try {
+        if (duplicate && !duplicate.contentHash) {
+          await setEvidenceContentHash(evidenceId, contentHash);
+        }
+        const attachment: EvidenceAttachment = {
+          attachmentId: duplicate?.attachments?.[0]?.attachmentId ?? newAttachmentId(),
+          originalFileName: source.name || file.name,
+          mimeType: source.mimeType || file.type || "application/octet-stream",
+          fileSize: file.size,
+          contentHash: fileHashes[0],
+          driveFileId: source.id,
+          ...(source.webViewLink ? { driveWebViewLink: source.webViewLink } : {}),
+          driveParentFolderId: linkedSource.id,
+          sourceKind: "drive_link",
+        };
+        await attachDriveFiles(evidenceId, [attachment]);
+        await saveEvidenceDriveSource(evidenceId, linkedSource);
+        await markAnalyzing(evidenceId);
+        const analysis = await analyzeEvidence([file], framework);
+        await saveAnalysis(evidenceId, analysis);
+        completed += 1;
+      } catch (error) {
+        const raw = error instanceof Error ? error.message : "UNKNOWN";
+        await markAnalysisFailed(evidenceId, raw).catch(() => undefined);
+        throw error;
+      }
+    }
+
+    if (!completed) {
+      setMessage("لم تُضف شواهد جديدة لأن الملفات المختارة موجودة مسبقًا في أثري.");
+      setIsError(false);
+      return;
+    }
+
+    router.push("/evidence");
   }
 
   async function processEvidence() {
@@ -275,6 +517,11 @@ export default function NewEvidencePage() {
         driveToken = await ensureDriveAccessToken();
       } catch {
         throw new Error("DRIVE_SIGNIN_REQUIRED");
+      }
+
+      if (sourceMode === "folder_batch") {
+        await processFolderBatch(user, driveToken);
+        return;
       }
 
       setMessage("جاري التحقق من عدم تكرار الشاهد…");
@@ -399,14 +646,7 @@ export default function NewEvidencePage() {
       stage = "analysis";
       setMessage("جاري تحليل الشاهد…");
 
-      const baseFramework = await getActiveFrameworkElements();
-      const framework = baseFramework.map((element) => ({
-        ...element,
-        requirements: requirementsForElement(element.id).map((requirement) => ({
-          id: requirement.id,
-          label: requirement.label,
-        })),
-      }));
+      const framework = await frameworkForAnalysis();
       const analysis = await analyzeEvidence(files, framework);
       await saveAnalysis(evidenceId, analysis);
 
@@ -425,7 +665,7 @@ export default function NewEvidencePage() {
       } else if (stage === "drive") {
         setMessage("تعذر حفظ بيانات الشاهد في Google Drive الآن. أعيدي المحاولة.");
       } else {
-        setMessage("تعذر إكمال العملية الآن. أعيدي المحاولة دون تغيير الملفات.");
+        setMessage(raw.startsWith("DRIVE_") ? driveErrorMessage(raw) : "تعذر إكمال العملية الآن. أعيدي المحاولة دون تغيير الملفات.");
       }
     } finally {
       setBusy(false);
@@ -433,7 +673,7 @@ export default function NewEvidencePage() {
   }
 
   return (
-    <AthShell back={{ href: "/evidence" }} title="إضافة شاهد" subtitle="إضافة ملفات للإنجاز نفسه.">
+    <AthShell back={{ href: "/evidence" }} title="إضافة شاهد" subtitle="إضافة ملفات للإنجاز نفسه أو تحديث مجلد مرتبط.">
       <div className="ath-steps" aria-label="مراحل إضافة الشاهد">
         <span className="on"><b>1</b>اختيار</span>
         <span className={busy ? "on" : ""}><b>2</b>تحليل</span>
@@ -442,7 +682,7 @@ export default function NewEvidencePage() {
 
       <div className="v7-field-head">
         <strong>مصدر الشاهد</strong>
-        <InfoTip text="يمكن رفع الملفات من الجهاز أو ربط ملف أو مجلد من Google Drive. الملفات المرتبطة تبقى في مكانها الأصلي." />
+        <InfoTip text="يمكن رفع الملفات من الجهاز، اختيار ملفات من Google Drive، أو ربط مجلد متجدد مثل «دوراتي»." />
       </div>
 
       <div className="ath-actions" style={{ marginBottom: 12 }}>
@@ -458,9 +698,49 @@ export default function NewEvidencePage() {
           />
         </label>
         <button type="button" className="ath-btn outline fit" onClick={chooseFromDrive} disabled={busy}>
-          <Glyph name="folder" size={18} /> من Google Drive
+          <Glyph name="docOutline" size={18} /> ملف من Drive
+        </button>
+        <button type="button" className="ath-btn outline fit" onClick={linkNewFolder} disabled={busy}>
+          <Glyph name="folder" size={18} /> ربط مجلد
         </button>
       </div>
+
+      {linkedFolders.length ? (
+        <Panel
+          icon={<Glyph name="folder" size={22} />}
+          title="المجلدات المرتبطة"
+          sub="اربطِي المجلد مرة واحدة، ثم استخدمي «تحديث» عند إضافة ملفات جديدة."
+        >
+          <div className="ath-stack">
+            {linkedFolders.map((folder) => (
+              <div className="ath-file-row" key={folder.id}>
+                <span className="ic"><Glyph name="folder" size={18} /></span>
+                <div className="nm">
+                  <strong>{folder.name}</strong>
+                  <span>{folder.lastCheckedAt ? "تمت مراجعته سابقًا" : "مرتبط وجاهز للتحديث"}</span>
+                </div>
+                <button
+                  type="button"
+                  className="ath-mini blue"
+                  onClick={() => refreshFolder(folder)}
+                  disabled={busy}
+                >
+                  تحديث
+                </button>
+                <button
+                  type="button"
+                  className="ath-icon-btn"
+                  onClick={() => unlinkFolder(folder)}
+                  disabled={busy}
+                  aria-label={`إلغاء ربط ${folder.name}`}
+                >
+                  <Glyph name="trash" size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
 
       <label className="ath-drop">
         <input
@@ -482,7 +762,11 @@ export default function NewEvidencePage() {
           title={files.length === 1 ? "ملف واحد" : files.length === 2 ? "ملفان" : `${files.length} ملفات`}
           sub={`${formatSize(totalBytes)} إجمالًا · ${sourceLabel || "شاهد واحد"}`}
         >
-          {isDriveLinked ? (
+          {sourceMode === "folder_batch" ? (
+            <Notice>
+              الملفات الجديدة من المجلد ستُنشأ كشواهد مستقلة، حتى تكون كل شهادة دورة قابلة للمراجعة والاعتماد بمفردها.
+            </Notice>
+          ) : isDriveLinked ? (
             <Notice>الملفات مرتبطة من Google Drive وتبقى في موقعها الأصلي. لا ينقلها أثري عند الاعتماد.</Notice>
           ) : null}
           <div className="ath-stack" style={{ marginTop: isDriveLinked ? 10 : 0 }}>
@@ -505,8 +789,8 @@ export default function NewEvidencePage() {
       {busy ? (
         <section className="ath-panel ath-scene-card" aria-live="polite">
           <Scene kind="analyzing" />
-          <strong>{message || "جاري تحليل الشاهد…"}</strong>
-          <p>أبقي الصفحة مفتوحة حتى يكتمل التحليل.</p>
+          <strong>{message || "جاري تنفيذ العملية…"}</strong>
+          <p>أبقي الصفحة مفتوحة حتى تكتمل العملية.</p>
         </section>
       ) : message ? (
         <Notice tone={isError ? "error" : "info"}>{message}</Notice>
@@ -514,7 +798,13 @@ export default function NewEvidencePage() {
 
       <button type="button" className="ath-btn primary block" onClick={processEvidence} disabled={!files.length || busy}>
         <Glyph name="sparkle" />
-        {busy ? "جاري الحفظ والتحليل…" : "حفظ وتحليل الشاهد"}
+        {busy
+          ? "جاري الحفظ والتحليل…"
+          : sourceMode === "folder_batch"
+          ? files.length === 1
+            ? "تحليل الشهادة الجديدة"
+            : `تحليل ${files.length} شهادات كشواهد مستقلة`
+          : "حفظ وتحليل الشاهد"}
       </button>
     </AthShell>
   );

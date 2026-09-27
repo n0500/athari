@@ -5,6 +5,8 @@ export type PickedDriveItem = {
   url?: string;
 };
 
+const GOOGLE_FOLDER_MIME = "application/vnd.google-apps.folder";
+
 declare global {
   interface Window {
     gapi?: {
@@ -59,10 +61,6 @@ function loadPickerApi() {
 }
 
 function pickerConfig() {
-  // Google Picker needs its own Browser API key. Do not fall back to the
-  // Firebase Web API key because Firebase keys can be restricted to APIs
-  // that Picker does not accept and Google then shows a raw "invalid
-  // developer key" dialog to the teacher.
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY || "";
   const explicitProject = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_NUMBER || "";
   const firebaseAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "";
@@ -70,20 +68,36 @@ function pickerConfig() {
   return { apiKey, appId: explicitProject || derivedProject };
 }
 
-export async function pickDriveItem(accessToken: string): Promise<PickedDriveItem | null> {
-  const { apiKey, appId } = pickerConfig();
-  if (!apiKey) throw new Error("PICKER_NOT_CONFIGURED");
-
-  await loadPickerApi();
-  const google = window.google;
-  if (!google?.picker) throw new Error("PICKER_UNAVAILABLE");
-
-  return new Promise<PickedDriveItem | null>((resolve, reject) => {
+function createPicker(
+  accessToken: string,
+  options: {
+    folderOnly?: boolean;
+    parentId?: string;
+    multiple?: boolean;
+    title?: string;
+  } = {}
+): Promise<PickedDriveItem[]> {
+  return new Promise<PickedDriveItem[]>((resolve, reject) => {
     try {
-      const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-        .setIncludeFolders(true)
-        .setSelectFolderEnabled(true)
+      const google = window.google;
+      if (!google?.picker) throw new Error("PICKER_UNAVAILABLE");
+      const { apiKey, appId } = pickerConfig();
+      if (!apiKey) throw new Error("PICKER_NOT_CONFIGURED");
+
+      let view = new google.picker.DocsView(google.picker.ViewId.DOCS)
         .setMode(google.picker.DocsViewMode.LIST);
+
+      if (options.folderOnly) {
+        view = view
+          .setIncludeFolders(true)
+          .setSelectFolderEnabled(true)
+          .setMimeTypes(GOOGLE_FOLDER_MIME);
+      } else {
+        view = view
+          .setIncludeFolders(true)
+          .setSelectFolderEnabled(false);
+        if (options.parentId) view = view.setParent(options.parentId);
+      }
 
       let builder = new google.picker.PickerBuilder()
         .addView(view)
@@ -91,32 +105,67 @@ export async function pickDriveItem(accessToken: string): Promise<PickedDriveIte
         .setDeveloperKey(apiKey)
         .setLocale("ar")
         .setOrigin(window.location.origin)
-        .setTitle("اختيار ملف أو مجلد من Google Drive")
+        .setTitle(
+          options.title ||
+            (options.folderOnly
+              ? "اختيار مجلد من Google Drive"
+              : "اختيار ملفات من Google Drive")
+        )
         .setCallback((data: any) => {
           const action = data?.action;
           if (action === google.picker.Action.CANCEL) {
-            resolve(null);
+            resolve([]);
             return;
           }
           if (action !== google.picker.Action.PICKED) return;
-          const doc = data?.docs?.[0];
-          if (!doc) {
-            resolve(null);
-            return;
-          }
-          resolve({
-            id: String(doc.id || ""),
-            name: String(doc.name || ""),
-            mimeType: String(doc.mimeType || ""),
-            url: typeof doc.url === "string" ? doc.url : undefined,
-          });
+          const docs = Array.isArray(data?.docs) ? data.docs : [];
+          resolve(
+            docs
+              .map((doc: any) => ({
+                id: String(doc?.id || ""),
+                name: String(doc?.name || ""),
+                mimeType: String(doc?.mimeType || ""),
+                ...(typeof doc?.url === "string" ? { url: doc.url } : {}),
+              }))
+              .filter((doc: PickedDriveItem) => doc.id)
+          );
         });
 
+      if (options.multiple && google.picker.Feature?.MULTISELECT_ENABLED) {
+        builder = builder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
+      }
       if (appId) builder = builder.setAppId(appId);
-      const picker = builder.build();
-      picker.setVisible(true);
+      builder.build().setVisible(true);
     } catch (error) {
       reject(error instanceof Error ? error : new Error("PICKER_UNAVAILABLE"));
     }
   });
+}
+
+export async function pickDriveFolder(accessToken: string) {
+  const { apiKey } = pickerConfig();
+  if (!apiKey) throw new Error("PICKER_NOT_CONFIGURED");
+  await loadPickerApi();
+  const items = await createPicker(accessToken, { folderOnly: true });
+  const picked = items[0] ?? null;
+  if (picked && picked.mimeType !== GOOGLE_FOLDER_MIME) {
+    throw new Error("PICKER_FOLDER_REQUIRED");
+  }
+  return picked;
+}
+
+export async function pickDriveFiles(
+  accessToken: string,
+  options: { parentId?: string; multiple?: boolean; title?: string } = {}
+) {
+  const { apiKey } = pickerConfig();
+  if (!apiKey) throw new Error("PICKER_NOT_CONFIGURED");
+  await loadPickerApi();
+  return createPicker(accessToken, options);
+}
+
+/** Backward-compatible single-item picker for older callers. */
+export async function pickDriveItem(accessToken: string): Promise<PickedDriveItem | null> {
+  const items = await pickDriveFiles(accessToken, { multiple: false });
+  return items[0] ?? null;
 }
