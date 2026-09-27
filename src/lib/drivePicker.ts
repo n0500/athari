@@ -59,10 +59,11 @@ function loadPickerApi() {
 }
 
 function pickerConfig() {
-  const apiKey =
-    process.env.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY ||
-    process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
-    "";
+  // Google Picker needs its own Browser API key. Do not fall back to the
+  // Firebase Web API key because Firebase keys can be restricted to APIs
+  // that Picker does not accept and Google then shows a raw "invalid
+  // developer key" dialog to the teacher.
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PICKER_API_KEY || "";
   const explicitProject = process.env.NEXT_PUBLIC_GOOGLE_CLOUD_PROJECT_NUMBER || "";
   const firebaseAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "";
   const derivedProject = firebaseAppId.split(":")[1] || "";
@@ -70,12 +71,12 @@ function pickerConfig() {
 }
 
 export async function pickDriveItem(accessToken: string): Promise<PickedDriveItem | null> {
+  const { apiKey, appId } = pickerConfig();
+  if (!apiKey) throw new Error("PICKER_NOT_CONFIGURED");
+
   await loadPickerApi();
   const google = window.google;
   if (!google?.picker) throw new Error("PICKER_UNAVAILABLE");
-
-  const { apiKey, appId } = pickerConfig();
-  if (!apiKey) throw new Error("PICKER_NOT_CONFIGURED");
 
   return new Promise<PickedDriveItem | null>((resolve, reject) => {
     try {

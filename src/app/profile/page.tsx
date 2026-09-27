@@ -11,7 +11,8 @@ import {
   getProfessionalProfile,
   saveProfessionalProfile,
 } from "@/lib/professionalProfile";
-import type { ProfessionalProfile } from "@/types/athari";
+import { listUserEvidence } from "@/lib/firestore";
+import type { EvidenceRecord, ProfessionalProfile } from "@/types/athari";
 
 function lines(value: string) {
   return value
@@ -20,12 +21,30 @@ function lines(value: string) {
     .filter(Boolean);
 }
 
+function unique(items: string[]) {
+  return [...new Set(items.map((item) => item.trim()).filter(Boolean))];
+}
+
+const GOAL_OPTIONS = [
+  "تعزيز التنوع في استراتيجيات التدريس بما يلائم حاجات المتعلمين.",
+  "تطوير توظيف التقنيات والذكاء الاصطناعي في العملية التعليمية.",
+  "تعميق تحليل نتائج المتعلمين والاستفادة من البيانات في تحسين التدريس.",
+  "تطوير أساليب وأدوات التقويم والتغذية الراجعة.",
+  "تعزيز الخطط العلاجية والإثرائية ومتابعة أثرها على تعلم الطالب.",
+  "توسيع المشاركة في مجتمعات التعلم المهنية وتبادل الخبرات.",
+  "تعزيز التواصل والشراكة مع أولياء الأمور.",
+  "تطوير بيئة تعليمية آمنة ومحفزة وداعمة للتعلم.",
+  "تعزيز الإدارة الصفية والانضباط الإيجابي.",
+  "تطوير التخطيط للتعلم وربط الأنشطة بالأهداف التعليمية.",
+];
+
 export default function ProfessionalProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfessionalProfile>({ ...EMPTY_PROFESSIONAL_PROFILE });
   const [achievementsText, setAchievementsText] = useState("");
   const [goalsText, setGoalsText] = useState("");
+  const [approvedEvidence, setApprovedEvidence] = useState<EvidenceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -39,7 +58,10 @@ export default function ProfessionalProfilePage() {
       }
       setUser(nextUser);
       try {
-        const saved = await getProfessionalProfile(nextUser.uid);
+        const [saved, evidence] = await Promise.all([
+          getProfessionalProfile(nextUser.uid),
+          listUserEvidence(nextUser.uid),
+        ]);
         const next = {
           ...saved,
           fullName: saved.fullName || nextUser.displayName?.trim() || "",
@@ -47,6 +69,7 @@ export default function ProfessionalProfilePage() {
         setProfile(next);
         setAchievementsText(next.achievements.join("\n"));
         setGoalsText(next.developmentGoals.join("\n"));
+        setApprovedEvidence(evidence.filter((item) => item.status === "approved"));
       } catch {
         setIsError(true);
         setMessage("تعذر تحميل الهوية المهنية الآن.");
@@ -55,6 +78,16 @@ export default function ProfessionalProfilePage() {
       }
     });
   }, [router]);
+
+  const achievementSuggestions = useMemo(
+    () =>
+      unique(
+        approvedEvidence.map(
+          (item) => item.approvedContent?.title || item.originalFileName
+        )
+      ).slice(0, 20),
+    [approvedEvidence]
+  );
 
   const preview = useMemo(
     () => ({
@@ -65,9 +98,33 @@ export default function ProfessionalProfilePage() {
     [profile, achievementsText, goalsText]
   );
 
+  const chosenAchievements = useMemo(() => new Set(lines(achievementsText)), [achievementsText]);
+  const chosenGoals = useMemo(() => new Set(lines(goalsText)), [goalsText]);
+
   function field<K extends keyof ProfessionalProfile>(key: K, value: ProfessionalProfile[K]) {
     setProfile((current) => ({ ...current, [key]: value }));
     setMessage("");
+    setIsError(false);
+  }
+
+  function toggleLine(currentText: string, setText: (value: string) => void, value: string) {
+    const current = lines(currentText);
+    const exists = current.includes(value);
+    const next = exists ? current.filter((item) => item !== value) : [...current, value];
+    setText(next.join("\n"));
+    setMessage("");
+    setIsError(false);
+  }
+
+  function fillAchievementsFromEvidence() {
+    if (!achievementSuggestions.length) {
+      setMessage("لا توجد شواهد معتمدة يمكن الاقتراح منها حتى الآن.");
+      setIsError(false);
+      return;
+    }
+    const next = unique([...lines(achievementsText), ...achievementSuggestions]).slice(0, 5);
+    setAchievementsText(next.join("\n"));
+    setMessage("أضيفت اقتراحات من شواهدك المعتمدة. يمكنك تعديلها أو حذفها قبل الحفظ.");
     setIsError(false);
   }
 
@@ -134,14 +191,68 @@ export default function ProfessionalProfilePage() {
             </div>
           </Panel>
 
-          <Panel icon={<Glyph name="sparkle" size={22} />} title="أبرز المنجزات والأهداف" sub="اختياري · سطر لكل بند">
+          <Panel icon={<Glyph name="sparkle" size={22} />} title="أبرز المنجزات المهنية" sub="اختاري من شواهدك أو أضيفيها يدويًا.">
+            <div className="ath-actions" style={{ marginBottom: 10 }}>
+              <button type="button" className="ath-btn outline fit" onClick={fillAchievementsFromEvidence}>
+                <Glyph name="sparkle" size={17} /> تعبئة من الشواهد المعتمدة
+              </button>
+            </div>
+
+            {achievementSuggestions.length ? (
+              <div className="ath-stack" style={{ marginBottom: 12 }}>
+                {achievementSuggestions.map((item) => {
+                  const selected = chosenAchievements.has(item);
+                  return (
+                    <button
+                      type="button"
+                      key={item}
+                      className={`ath-choice ${selected ? "sel" : ""}`}
+                      onClick={() => toggleLine(achievementsText, setAchievementsText, item)}
+                      aria-pressed={selected}
+                      style={{ textAlign: "right", width: "100%" }}
+                    >
+                      <span className="main" style={{ width: "100%" }}>
+                        <span className="tx"><strong>{item}</strong></span>
+                        <Glyph name={selected ? "check" : "empty"} size={22} />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="ath-fine">عند اعتماد الشواهد ستظهر هنا اقتراحات جاهزة للاختيار.</p>
+            )}
+
             <div className="ath-field">
-              <label>أبرز المنجزات المهنية</label>
-              <textarea value={achievementsText} onChange={(e) => setAchievementsText(e.target.value)} placeholder="منجز واحد في كل سطر" />
+              <label>المنجزات المختارة</label>
+              <textarea value={achievementsText} onChange={(e) => setAchievementsText(e.target.value)} placeholder="يمكنك أيضًا كتابة منجز واحد في كل سطر" />
+            </div>
+          </Panel>
+
+          <Panel icon={<Glyph name="chart" size={22} />} title="أهداف التطوير المهني" sub="قائمة مقترحة · اختاري ما يناسب خطتك المهنية.">
+            <div className="ath-stack" style={{ marginBottom: 12 }}>
+              {GOAL_OPTIONS.map((goal) => {
+                const selected = chosenGoals.has(goal);
+                return (
+                  <button
+                    type="button"
+                    key={goal}
+                    className={`ath-choice ${selected ? "sel" : ""}`}
+                    onClick={() => toggleLine(goalsText, setGoalsText, goal)}
+                    aria-pressed={selected}
+                    style={{ textAlign: "right", width: "100%" }}
+                  >
+                    <span className="main" style={{ width: "100%" }}>
+                      <span className="tx"><strong>{goal}</strong></span>
+                      <Glyph name={selected ? "check" : "empty"} size={22} />
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <div className="ath-field">
-              <label>أهداف التطوير المهني</label>
-              <textarea value={goalsText} onChange={(e) => setGoalsText(e.target.value)} placeholder="هدف واحد في كل سطر" />
+              <label>الأهداف المختارة</label>
+              <textarea value={goalsText} onChange={(e) => setGoalsText(e.target.value)} placeholder="يمكنك أيضًا كتابة هدف آخر في سطر مستقل" />
             </div>
           </Panel>
 
