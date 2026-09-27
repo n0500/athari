@@ -166,6 +166,16 @@ export default function NewEvidencePage() {
         return;
       }
 
+      // Request Google Drive access immediately from the button tap so
+      // mobile browsers can open Google sign-in reliably, then continue.
+      setMessage("جاري تجهيز حفظ الشاهد…");
+      let driveToken = "";
+      try {
+        driveToken = await ensureDriveAccessToken();
+      } catch {
+        throw new Error("DRIVE_SIGNIN_REQUIRED");
+      }
+
       setMessage("جاري التحقق من عدم تكرار الشاهد…");
       const { contentHash, fileHashes } = await computeEvidenceBundleHash(files);
 
@@ -232,20 +242,18 @@ export default function NewEvidencePage() {
             }
         );
 
-      let driveToken = "";
       let inboxId = "";
 
       for (let index = 0; index < files.length; index += 1) {
         if (progress[index]) continue; // already in Drive and recorded
 
         const file = files[index];
-        if (!driveToken) {
+        if (!inboxId) {
           setMessage(
             files.length > 1
               ? `جاري حفظ ${files.length} ملفات في Google Drive…`
               : "جاري حفظ الملف في Google Drive…"
           );
-          driveToken = await ensureDriveAccessToken();
           const { inbox } = await ensureAthariInbox(driveToken, academicYear);
           inboxId = inbox.id;
         }
@@ -288,10 +296,11 @@ export default function NewEvidencePage() {
         setMessage(
           "اكتملت حصة التحليل لهذا اليوم. الملفات محفوظة ومسجلة، ولن تُرفع مرة أخرى عند إعادة المحاولة."
         );
-      } else if (raw === "DRIVE_RECONNECT_REQUIRED") {
-        setMessage(
-          "انتهت جلسة Google Drive. أعيدي المحاولة لإعادة الربط؛ الملفات التي اكتمل رفعها مسجلة ولن تُرفع مرة أخرى."
-        );
+      } else if (
+        raw === "DRIVE_SIGNIN_REQUIRED" ||
+        raw === "DRIVE_RECONNECT_REQUIRED"
+      ) {
+        setMessage("يرجى تسجيل الدخول إلى Google لمتابعة حفظ الشاهد.");
       } else {
         setMessage(
           "تعذر إكمال العملية الآن. الملفات التي اكتمل رفعها مسجلة، ولن تُرفع مرة أخرى عند إعادة المحاولة."

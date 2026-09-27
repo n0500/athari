@@ -10,6 +10,8 @@ import { requireAuth } from "@/lib/firebase";
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const DRIVE_TOKEN_KEY = "athari_google_drive_access_token";
+const DRIVE_TOKEN_TIME_KEY = "athari_google_drive_access_token_saved_at";
+const DRIVE_TOKEN_MAX_AGE_MS = 50 * 60 * 1000;
 
 function provider() {
   const p = new GoogleAuthProvider();
@@ -21,18 +23,34 @@ function provider() {
 function saveDriveToken(token?: string | null) {
   if (typeof window !== "undefined" && token) {
     sessionStorage.setItem(DRIVE_TOKEN_KEY, token);
+    sessionStorage.setItem(DRIVE_TOKEN_TIME_KEY, String(Date.now()));
   }
 }
 
 export function clearStoredDriveToken() {
   if (typeof window !== "undefined") {
     sessionStorage.removeItem(DRIVE_TOKEN_KEY);
+    sessionStorage.removeItem(DRIVE_TOKEN_TIME_KEY);
   }
 }
 
 export function getStoredDriveToken() {
   if (typeof window === "undefined") return null;
-  return sessionStorage.getItem(DRIVE_TOKEN_KEY);
+
+  const token = sessionStorage.getItem(DRIVE_TOKEN_KEY);
+  if (!token) return null;
+
+  const savedAt = Number(sessionStorage.getItem(DRIVE_TOKEN_TIME_KEY));
+  if (
+    !Number.isFinite(savedAt) ||
+    savedAt <= 0 ||
+    Date.now() - savedAt >= DRIVE_TOKEN_MAX_AGE_MS
+  ) {
+    clearStoredDriveToken();
+    return null;
+  }
+
+  return token;
 }
 
 export async function signInWithGoogleAndDrive(): Promise<User> {
