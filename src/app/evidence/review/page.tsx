@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AthShell, ElementArt, Glyph, Notice, Panel } from "@/components/athari-ui/Ui";
 import { InfoTip } from "@/components/InfoTip";
+import { suggestIndicators } from "@/lib/ai";
 import { requireAuth } from "@/lib/firebase";
 import { ensureDriveAccessToken } from "@/lib/auth";
 import {
@@ -62,6 +63,9 @@ function ReviewInner() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [impact, setImpact] = useState("");
+  const [highlight, setHighlight] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
+  const [indicatorNote, setIndicatorNote] = useState("");
 
   useEffect(() => {
     if (!id) {
@@ -119,6 +123,9 @@ function ReviewInner() {
         setImpact(
           record?.approvedContent?.impact ?? record?.aiAnalysis?.draftImpact ?? ""
         );
+        setHighlight(
+          record?.approvedContent?.highlight ?? record?.aiAnalysis?.draftHighlight ?? ""
+        );
       })
       .catch(() => setError("تعذر تحميل الشاهد."))
       .finally(() => setLoading(false));
@@ -133,6 +140,42 @@ function ReviewInner() {
     () => suggestions.filter((suggestion) => selectedIds.includes(suggestion.elementId)),
     [suggestions, selectedIds]
   );
+
+  async function handleSuggestIndicators() {
+    if (!item || suggesting) return;
+    if (highlight.trim() && !window.confirm("سيُستبدل النص الحالي في حقل مؤشرات التميّز بالاقتراح الجديد. هل تريدين المتابعة؟")) return;
+    setSuggesting(true);
+    setIndicatorNote("");
+    try {
+      const approvedNames = item.approvedContent?.classifications?.map((entry) => entry.elementName) ?? [];
+      const result = await suggestIndicators({
+        title,
+        description,
+        impact,
+        facts: (item.aiAnalysis?.extractedFacts ?? []).map((entry) => entry.fact).filter(Boolean),
+        elements: selectedClassifications.length
+          ? selectedClassifications.map((entry) => entry.elementName)
+          : approvedNames,
+      });
+      if (result) {
+        setHighlight(result);
+        setIndicatorNote("أُضيف الاقتراح. راجعيه وعدّليه قبل الحفظ.");
+      } else {
+        setIndicatorNote("لم يجد أثري في بيانات هذا الشاهد ما يدعم مؤشر تميّز. يمكنك إضافة وصف أدق ثم المحاولة مرة أخرى.");
+      }
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
+      setIndicatorNote(
+        code === "AI_FREE_LIMIT_REACHED"
+          ? "بلغت خدمة الاقتراح حدّها اليومي. حاولي لاحقًا."
+          : code === "AI_INDICATORS_UNAVAILABLE"
+          ? "خدمة الاقتراح غير مفعّلة بعد."
+          : "تعذّر الحصول على اقتراح الآن. حاولي مرة أخرى."
+      );
+    } finally {
+      setSuggesting(false);
+    }
+  }
 
   const canApprove = useMemo(
     () =>
@@ -241,6 +284,7 @@ function ReviewInner() {
         title: title.trim(),
         description: description.trim(),
         impact: impact.trim(),
+        ...(highlight.trim() ? { highlight: highlight.trim() } : {}),
       };
 
       await approveEvidenceLinkedSafe(id, approved, movedParentId);
@@ -426,6 +470,20 @@ function ReviewInner() {
         <div className="ath-field"><label htmlFor="ev-title">عنوان الشاهد</label><input id="ev-title" value={title} onChange={(event) => setTitle(event.target.value)} /></div>
         <div className="ath-field"><label htmlFor="ev-desc">وصف التنفيذ</label><textarea id="ev-desc" value={description} onChange={(event) => setDescription(event.target.value)} /></div>
         <div className="ath-field"><label htmlFor="ev-impact">الأثر المدعوم</label><textarea id="ev-impact" value={impact} onChange={(event) => setImpact(event.target.value)} /></div>
+        <div className="ath-field">
+          <label htmlFor="ev-highlight" className="v7-inline">
+            مؤشرات التميّز (اختياري)
+            <InfoTip text="نقطة أو نقطتان، كل نقطة في سطر: ابتكار، أو اتساع الأثر، أو نتيجة موثقة، أو نقل التجربة. تُجمع تلقائيًا في صفحة عنصر التقييم مع رابط لهذا الشاهد، وتُكتب مما يثبته الشاهد فقط. تُكتب مما يثبته الشاهد فقط." />
+          </label>
+          <textarea id="ev-highlight" rows={4} maxLength={400} value={highlight} onChange={(event) => setHighlight(event.target.value)} placeholder={"مثال:\nأول تطبيق لهذه الاستراتيجية في مقررات الصف الأول الثانوي بالمدرسة.\nنُقلت التجربة لزميلات القسم عبر ورشة تطبيقية."} />
+          <div className="rv-suggest">
+            <button type="button" onClick={handleSuggestIndicators} disabled={suggesting} aria-busy={suggesting}>
+              <Glyph name="star" size={15} />
+              {suggesting ? "جاري الاقتراح…" : "اقترح مؤشرات التميّز"}
+            </button>
+            {indicatorNote ? <span role="status">{indicatorNote}</span> : null}
+          </div>
+        </div>
       </Panel>
 
       {analysis?.missingInformation ? (

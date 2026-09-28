@@ -153,3 +153,31 @@ export async function analyzeEvidence(
   if (direct) return direct;
   throw directError ?? new Error("AI_DOCUMENT_UNREADABLE");
 }
+
+export type IndicatorInput = {
+  title: string;
+  description: string;
+  impact: string;
+  facts: string[];
+  elements: string[];
+};
+
+/** Suggests excellence indicators from text already stored with the evidence. */
+export async function suggestIndicators(input: IndicatorInput): Promise<string> {
+  const user = requireAuth().currentUser;
+  if (!user) throw new Error("AUTH_REQUIRED");
+
+  const idToken = await user.getIdToken();
+  const response = await fetch(`${endpoint.replace(/\/$/, "")}/indicators`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (response.status === 429) throw new Error("AI_FREE_LIMIT_REACHED");
+  if (response.status === 404) throw new Error("AI_INDICATORS_UNAVAILABLE");
+  if (!response.ok) throw new Error(`AI_ERROR_${response.status}`);
+
+  const payload = (await response.json()) as { indicators?: string };
+  return (payload.indicators ?? "").trim();
+}

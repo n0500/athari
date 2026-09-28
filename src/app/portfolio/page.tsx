@@ -26,6 +26,7 @@ import {
 } from "@/lib/drive";
 import { listUserEvidence } from "@/lib/firestore";
 import { getProfessionalProfile } from "@/lib/professionalProfile";
+import { getProfessionalDocuments, orderedDocuments } from "@/lib/professionalDocuments";
 import {
   createOrUpdatePortfolioShare,
   forgetPermissions,
@@ -43,6 +44,7 @@ import {
   ApprovedClassification,
   EvidenceAttachment,
   EvidenceRecord,
+  ProfessionalDocument,
   ProfessionalProfile,
 } from "@/types/athari";
 
@@ -89,6 +91,7 @@ function shareEvidenceFor(items: EvidenceRecord[]): ShareEvidence[] {
     title: item.approvedContent?.title || item.originalFileName,
     description: item.approvedContent?.description || "",
     impact: item.approvedContent?.impact || "",
+    highlight: item.approvedContent?.highlight || "",
     classifications: classificationsFor(item).map((classification) => ({
       elementId: classification.elementId,
       elementName: classification.elementName,
@@ -109,6 +112,7 @@ export default function PortfolioPage() {
   const [items, setItems] = useState<EvidenceRecord[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [professionalProfile, setProfessionalProfile] = useState<ProfessionalProfile | null>(null);
+  const [documents, setDocuments] = useState<ProfessionalDocument[]>([]);
   const [loading, setLoading] = useState(firebaseConfigured);
   const [error, setError] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
@@ -148,11 +152,13 @@ export default function PortfolioPage() {
 
       try {
         setError("");
-        const [all, activeShare, profile] = await Promise.all([
+        const [all, activeShare, profile, savedDocuments] = await Promise.all([
           listUserEvidence(nextUser.uid),
           getActivePortfolioShare(nextUser.uid).catch(() => null),
           getProfessionalProfile(nextUser.uid).catch(() => null),
+          getProfessionalDocuments(nextUser.uid).catch(() => []),
         ]);
+        setDocuments(orderedDocuments(savedDocuments).filter((entry) => entry.showToPrincipal));
 
         setItems(all.filter((item) => item.status === "approved"));
         setProfessionalProfile(profile);
@@ -208,10 +214,10 @@ export default function PortfolioPage() {
           attachmentsFor(item)
             .map((attachment) => attachment.driveFileId)
             .filter((value): value is string => Boolean(value))
-        )
+        ).concat(documents.map((entry) => entry.driveFileId))
       ),
     ],
-    [items]
+    [items, documents]
   );
 
   async function copyShareLink(url: string) {
@@ -257,6 +263,13 @@ export default function PortfolioPage() {
           evidence: shareEvidenceFor(items),
           drivePermissions: [...published, ...removedPermissions],
           ...(professionalProfile ? { professionalProfile } : {}),
+          documents: documents.map((entry) => ({
+            kind: entry.kind,
+            label: entry.label,
+            originalFileName: entry.originalFileName,
+            mimeType: entry.mimeType,
+            driveFileId: entry.driveFileId,
+          })),
         });
       } catch (shareError) {
         await revokePortfolioPermissions(

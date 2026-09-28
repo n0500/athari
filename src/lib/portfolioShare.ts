@@ -28,8 +28,18 @@ export type ShareEvidence = {
   title: string;
   description: string;
   impact: string;
+  highlight?: string;
   classifications: ShareClassification[];
   attachments: ShareAttachment[];
+};
+
+/** A professional document (license, timetable…) the teacher chose to show. */
+export type ShareDocument = {
+  kind: string;
+  label: string;
+  originalFileName: string;
+  mimeType: string;
+  driveFileId: string;
 };
 
 export type ShareDrivePermission = {
@@ -47,7 +57,23 @@ export type PortfolioShare = {
   evidence: ShareEvidence[];
   drivePermissions: ShareDrivePermission[];
   professionalProfile?: ProfessionalProfile;
+  documents: ShareDocument[];
 };
+
+function normalizeShareDocuments(value: unknown): ShareDocument[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
+    .map((raw) => ({
+      kind: typeof raw.kind === "string" ? raw.kind : "other",
+      label: typeof raw.label === "string" ? raw.label : "وثيقة",
+      originalFileName: typeof raw.originalFileName === "string" ? raw.originalFileName : "",
+      mimeType: typeof raw.mimeType === "string" ? raw.mimeType : "",
+      driveFileId: typeof raw.driveFileId === "string" ? raw.driveFileId : "",
+    }))
+    .filter((entry) => entry.driveFileId)
+    .slice(0, 10);
+}
 
 function randomToken() {
   const bytes = new Uint8Array(24);
@@ -82,6 +108,7 @@ function normalizeShare(id: string, value: unknown): PortfolioShare | null {
       raw.professionalProfile && typeof raw.professionalProfile === "object"
         ? normalizeProfessionalProfile(raw.professionalProfile)
         : undefined,
+    documents: normalizeShareDocuments(raw.documents),
   };
 }
 
@@ -106,6 +133,7 @@ export async function createOrUpdatePortfolioShare(input: {
   evidence: ShareEvidence[];
   drivePermissions: ShareDrivePermission[];
   professionalProfile?: ProfessionalProfile;
+  documents?: ShareDocument[];
 }) {
   const current = await getActivePortfolioShare(input.uid);
   const shareId = current?.id ?? randomToken();
@@ -117,6 +145,7 @@ export async function createOrUpdatePortfolioShare(input: {
     active: true,
     evidence: input.evidence,
     drivePermissions: input.drivePermissions,
+    documents: normalizeShareDocuments(input.documents ?? []),
     ...(input.professionalProfile
       ? { professionalProfile: normalizeProfessionalProfile(input.professionalProfile) }
       : {}),
@@ -170,13 +199,15 @@ export async function pruneActiveShare(uid: string, approvedIds: Set<string>) {
     return { shareId: share.id, changed: false, dropped: [] as ShareDrivePermission[] };
   }
 
-  const stillUsed = new Set(
-    evidence.flatMap((item) =>
+  const stillUsed = new Set([
+    ...evidence.flatMap((item) =>
       item.attachments
         .map((attachment) => attachment.driveFileId)
         .filter((value): value is string => Boolean(value))
-    )
-  );
+    ),
+    // Professional documents stay shared even when evidence is pruned.
+    ...share.documents.map((entry) => entry.driveFileId),
+  ]);
 
   await updateDoc(doc(requireDb(), "publicShares", share.id), {
     evidence,

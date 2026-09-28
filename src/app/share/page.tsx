@@ -15,6 +15,8 @@ import {
   StatStrip,
 } from "@/components/athari-ui/Ui";
 import { ProfessionalIdentityCard } from "@/components/ProfessionalIdentityCard";
+import { EvidenceReport } from "@/components/EvidenceReport";
+import { ElementExcellence } from "@/components/ElementExcellence";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import { ELEMENT_GUIDANCE } from "@/data/element-guidance";
 import {
@@ -63,6 +65,7 @@ export default function PublicSharePage() {
   const [error, setError] = useState("");
   const [viewer, setViewer] = useState<ViewerAttachment | null>(null);
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
+  const [report, setReport] = useState<ShareEvidence | null>(null);
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("token") ?? "";
@@ -126,12 +129,6 @@ export default function PublicSharePage() {
     ? grouped.find((group) => group.element.id === activeElementId) ?? null
     : null;
 
-  function openFirstAttachment(item: ShareEvidence) {
-    const attachment = item.attachments.find((entry) => entry.driveFileId);
-    if (!attachment) return;
-    setViewer({ ...attachment, title: item.title });
-  }
-
   function openSpecificAttachment(item: ShareEvidence, attachmentIndex: number) {
     const attachment = item.attachments[attachmentIndex];
     if (!attachment?.driveFileId) return;
@@ -186,10 +183,7 @@ export default function PublicSharePage() {
       description: item.description,
       elementId: primary?.elementId,
       elementName: primary?.elementName,
-      view: {
-        onClick: () => openFirstAttachment(item),
-        disabled: !item.attachments.some((entry) => entry.driveFileId),
-      },
+      view: { onClick: () => setReport(item) },
     };
   });
 
@@ -214,16 +208,23 @@ export default function PublicSharePage() {
               category={activeGroup.element.category}
               description={activeGroup.element.description}
               supports={ELEMENT_GUIDANCE[activeGroup.element.id]?.supports ?? []}
+              excellence={
+                <ElementExcellence
+                  sources={activeGroup.evidence.map((item) => ({ id: item.id, title: item.title, highlight: item.highlight }))}
+                  requirements={{ done: activeCompleted.size, total: activeRequirements.length }}
+                  onOpenEvidence={(id) => {
+                    const found = activeGroup.evidence.find((entry) => entry.id === id);
+                    if (found) setReport(found);
+                  }}
+                />
+              }
               crumbs={[{ label: "ملف الأداء", tap: { onClick: () => setActiveElementId(null) } }, { label: "عناصر التقييم", tap: { onClick: () => setActiveElementId(null) } }]}
               evidence={activeGroup.evidence.map((item) => ({
                 id: item.id,
                 title: item.title,
                 description: item.description,
                 fileCount: item.attachments.length,
-                view: {
-                  onClick: () => openSpecificAttachment(item, Math.max(0, item.attachments.findIndex((entry) => entry.driveFileId))),
-                  disabled: !item.attachments.some((entry) => entry.driveFileId),
-                },
+                view: { onClick: () => setReport(item) },
                 extra: (
                   <>
                     {item.impact ? <div className="ath-impact">{item.impact}</div> : null}
@@ -276,7 +277,13 @@ export default function PublicSharePage() {
             <ProfessionalIdentityCard
               profile={share.professionalProfile}
               fallbackName={share.ownerDisplayName}
+              documents={share.documents.map((entry) => ({ key: entry.driveFileId, label: entry.label }))}
+              onOpenDocument={(key) => {
+                const entry = share.documents.find((item) => item.driveFileId === key);
+                if (entry) setViewer({ ...entry, title: entry.label });
+              }}
             />
+
 
             <StatStrip
               first={{ title: "صفحة للعرض فقط", sub: "لا يمكن التعديل على المحتوى" }}
@@ -313,6 +320,31 @@ export default function PublicSharePage() {
         )}
       </AthShell>
 
+      {report ? (
+        <EvidenceReport
+          item={report}
+          position={{ index: Math.max(0, allEvidence.findIndex((entry) => entry.id === report.id)), total: allEvidence.length }}
+          onPrev={(() => {
+            const at = allEvidence.findIndex((entry) => entry.id === report.id);
+            return at > 0 ? () => setReport(allEvidence[at - 1]) : undefined;
+          })()}
+          onNext={(() => {
+            const at = allEvidence.findIndex((entry) => entry.id === report.id);
+            return at >= 0 && at < allEvidence.length - 1 ? () => setReport(allEvidence[at + 1]) : undefined;
+          })()}
+          meta={{
+            ownerName: share.professionalProfile?.fullName || share.ownerDisplayName,
+            ministry: share.professionalProfile?.employer || "",
+            school: share.professionalProfile?.school || "",
+            department: share.professionalProfile?.educationDepartment || "",
+            principalName: share.professionalProfile?.principalName || "",
+            academicYear: share.academicYear,
+          }}
+          onClose={() => setReport(null)}
+          onOpenAttachment={(index) => openSpecificAttachment(report, index)}
+        />
+      ) : null}
+
       {viewer?.driveFileId ? (
         <div className="share-viewer-backdrop no-print" onClick={() => setViewer(null)}>
           <section className="share-viewer" onClick={(event) => event.stopPropagation()}>
@@ -327,3 +359,4 @@ export default function PublicSharePage() {
     </>
   );
 }
+

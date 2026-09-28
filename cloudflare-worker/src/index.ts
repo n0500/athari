@@ -22,6 +22,7 @@ type Analysis = {
   draftTitle: string;
   draftDescription: string;
   draftImpact: string;
+  draftHighlight: string;
   missingInformation: null | { question: string; reason: string };
   warnings: string[];
   unreadableFiles?: string[];
@@ -200,6 +201,7 @@ function sanitizeAnalysis(
     draftTitle: asString(raw.draftTitle),
     draftDescription: asString(raw.draftDescription),
     draftImpact: asString(raw.draftImpact),
+    draftHighlight: asString(raw.draftHighlight),
     missingInformation: question
       ? { question, reason: asString(missing?.reason) }
       : null,
@@ -233,6 +235,82 @@ async function fileToMarkdown(file: File, env: Env) {
     : "";
 }
 
+const MAX_INDICATOR_INPUT = 12000;
+
+function cleanIndicatorLines(value: unknown) {
+  return asString(value)
+    .split(/\n+/)
+    .map((line) => line.replace(/^[\s•\-–*·◆\d.)]+/, "").trim())
+    .filter((line) => line.length > 0 && line.length <= 200)
+    .slice(0, 3)
+    .join("\n");
+}
+
+/**
+ * Suggests excellence indicators for an evidence item that was analysed
+ * before indicators existed. It reads only text already stored with the
+ * evidence (approved wording and extracted facts), so no file is re-read.
+ */
+async function handleIndicators(request: Request, env: Env, origin: string) {
+  try {
+    await verifyFirebaseToken(request, env);
+
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const facts = Array.isArray(body.facts) ? body.facts.map(asString).filter(Boolean).slice(0, 20) : [];
+    const elements = Array.isArray(body.elements) ? body.elements.map(asString).filter(Boolean).slice(0, 5) : [];
+    const source = [
+      `العنوان: ${asString(body.title)}`,
+      `وصف التنفيذ: ${asString(body.description)}`,
+      `الأثر: ${asString(body.impact)}`,
+      elements.length ? `عناصر التقييم: ${elements.join("، ")}` : "",
+      facts.length ? `حقائق مستخرجة من الشاهد:\n- ${facts.join("\n- ")}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, MAX_INDICATOR_INPUT);
+
+    if (!asString(body.title) && !asString(body.description) && !facts.length) {
+      return Response.json({ error: "EVIDENCE_TEXT_REQUIRED" }, { status: 400, headers: cors(origin) });
+    }
+
+    const prompt = `
+You write "excellence indicators" (مؤشرات التميّز) for ONE teacher evidence item, using ONLY the text below.
+
+RULES:
+- Up to 3 lines, one indicator per line, each at most 20 words, formal Modern Standard Arabic.
+- Each line shows why the work goes beyond the basic requirement, chosen only from what the text documents: innovation (a first or new practice), reach (beyond her own class: department, school, parents, community), documented measurable result, or sustainability/transfer (repeated practice, shared with colleagues).
+- Never invent firsts, numbers, dates, results, participants or places. No generic praise. Do not restate the title.
+- If the text does not support any indicator, return an empty string.
+- Return JSON only: {"indicators":"line1\nline2"}
+
+EVIDENCE TEXT:
+${source}
+`;
+
+    const aiResult = await env.AI.run(MODEL, {
+      messages: [
+        { role: "system", content: "Return one valid JSON object only. Evidence-grounded. Never fabricate." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.1,
+      max_completion_tokens: 400,
+      chat_template_kwargs: { enable_thinking: false },
+    });
+
+    const parsed = parseModelJson(aiResult);
+    const raw = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+
+    return Response.json(
+      { indicators: cleanIndicatorLines(raw.indicators) },
+      { headers: { ...cors(origin), "Cache-Control": "no-store" } }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "UNKNOWN_ERROR";
+    const status = message === "UNAUTHORIZED" ? 401 : /quota|limit|too many|429/i.test(message) ? 429 : 500;
+    return Response.json({ error: message }, { status, headers: cors(origin) });
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const origin = allowedOrigin(request, env);
@@ -242,6 +320,9 @@ export default {
     }
 
     const url = new URL(request.url);
+    if (request.method === "POST" && url.pathname === "/indicators") {
+      return handleIndicators(request, env, origin);
+    }
     if (request.method !== "POST" || url.pathname !== "/analyze") {
       return Response.json(
         { error: "NOT_FOUND" },
@@ -376,6 +457,7 @@ NON-NEGOTIABLE RULES:
 - requirementIds are suggestions for teacher confirmation, not an automatic score or final decision.
 - draftImpact must contain only impact directly supported by evidence.
 - If no impact is documented, write exactly: "لا يوجد أثر موثق متاح حاليًا."
+- draftHighlight lists up to 3 "excellence indicators" (مؤشرات التميّز), one per line separated by "\n", each at most 20 words, formal Arabic. Each line shows why the work goes beyond the basic requirement, choosing only from what the evidence documents: innovation (a first or new practice), reach (beyond her own class: department, school, parents, community), documented measurable result, or sustainability/transfer (repeated practice, shared with colleagues). Never invent firsts, numbers, dates, results or participants; no generic praise. Return fewer lines, or an empty string, when the evidence does not support them.
 - Ask at most ONE essential missing-information question.
 - Never score or rate the teacher.
 - Return JSON only, with no Markdown fence and no commentary.
@@ -393,6 +475,7 @@ Required JSON shape:
   "draftTitle":"",
   "draftDescription":"",
   "draftImpact":"",
+  "draftHighlight":"",
   "missingInformation":null,
   "warnings":[]
 }

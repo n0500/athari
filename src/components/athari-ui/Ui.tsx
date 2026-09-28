@@ -371,10 +371,10 @@ const SUPPORT_LOOK = [
 ];
 
 export function ElementDetail({
-  elementId, name, category, description, supports, evidence, loading, crumbs,
+  elementId, name, category, description, supports, evidence, loading, crumbs, excellence,
 }: {
   elementId: string; name: string; category?: string; description?: string; supports: string[];
-  evidence: DetailEvidence[]; loading?: boolean;
+  evidence: DetailEvidence[]; loading?: boolean; excellence?: ReactNode;
   crumbs: { label: string; tap?: Tap }[];
 }) {
   const cat = categoryLabel(category);
@@ -410,6 +410,8 @@ export function ElementDetail({
           ) : null}
         </div>
       </section>
+
+      {excellence}
 
       {description ? (
         <Panel icon={<Glyph name="docOutline" size={24} />} title="تفسير العنصر">

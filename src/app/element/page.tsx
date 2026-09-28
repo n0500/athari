@@ -6,6 +6,9 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AthShell, ElementDetail, Glyph, Notice, Panel } from "@/components/athari-ui/Ui";
 import { Icon } from "@/components/Icon";
+import { EvidenceReport, type ReportEvidence } from "@/components/EvidenceReport";
+import { getProfessionalProfile } from "@/lib/professionalProfile";
+import { ElementExcellence } from "@/components/ElementExcellence";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import { ELEMENT_GUIDANCE } from "@/data/element-guidance";
 import { requirementsForElement } from "@/data/mandatory-requirements";
@@ -47,12 +50,28 @@ function attachmentsFor(item: EvidenceRecord): EvidenceAttachment[] {
   ];
 }
 
+function reportClassifications(item: EvidenceRecord): ReportEvidence["classifications"] {
+  const approved = item.approvedContent;
+  if (!approved) return [];
+  if (approved.classifications?.length) {
+    return approved.classifications.map((entry) => ({
+      elementId: entry.elementId,
+      elementName: entry.elementName,
+      isPrimary: entry.isPrimary,
+      requirementIds: entry.requirementIds ?? [],
+    }));
+  }
+  return approved.elementId ? [{ elementId: approved.elementId, elementName: approved.elementName, isPrimary: true }] : [];
+}
+
 function ElementPageInner() {
   const params = useSearchParams();
   const router = useRouter();
   const elementId = params.get("id") ?? "";
   const element = OFFICIAL_TEACHER_FRAMEWORK_V2.find((entry) => entry.id === elementId);
   const guidance = element ? ELEMENT_GUIDANCE[element.id] : undefined;
+  const [report, setReport] = useState<{ data: ReportEvidence; links: string[] } | null>(null);
+  const [owner, setOwner] = useState({ name: "", ministry: "", school: "", department: "", principal: "" });
   const [items, setItems] = useState<EvidenceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -64,6 +83,18 @@ function ElementPageInner() {
         setLoading(false);
         return;
       }
+
+      getProfessionalProfile(user.uid)
+        .then((profile) =>
+          setOwner({
+            name: profile.fullName || user.displayName?.trim() || "",
+            ministry: profile.employer,
+            school: profile.school,
+            department: profile.educationDepartment,
+            principal: profile.principalName ?? "",
+          })
+        )
+        .catch(() => setOwner({ name: user.displayName?.trim() || "", ministry: "", school: "", department: "", principal: "" }));
 
       try {
         setError("");
@@ -105,6 +136,25 @@ function ElementPageInner() {
     );
   }
 
+  function openReport(item: EvidenceRecord) {
+    setReport({
+      data: {
+        id: item.id,
+        title: item.approvedContent?.title || item.originalFileName,
+        description: item.approvedContent?.description || "",
+        impact: item.approvedContent?.impact || "",
+        highlight: item.approvedContent?.highlight || "",
+        classifications: reportClassifications(item),
+        attachments: attachmentsFor(item).map((attachment) => ({
+          originalFileName: attachment.originalFileName,
+          mimeType: attachment.mimeType,
+          ...(attachment.driveFileId ? { driveFileId: attachment.driveFileId } : {}),
+        })),
+      },
+      links: attachmentsFor(item).map((attachment) => attachment.driveWebViewLink || ""),
+    });
+  }
+
   const evidence = items.map((item) => {
     const impact = item.approvedContent?.impact || "";
     const firstLink = attachmentsFor(item)[0]?.driveWebViewLink;
@@ -116,6 +166,13 @@ function ElementPageInner() {
       view: { href: `/evidence/review?id=${encodeURIComponent(item.id)}` },
       extra: (
         <>
+          <button
+            type="button"
+            className="ath-attach no-print"
+            onClick={() => openReport(item)}
+          >
+            <Glyph name="download" size={14} /> تقرير PDF
+          </button>
           {impact && impact !== "لا يوجد أثر موثق متاح حاليًا." ? (
             <div className="ath-impact">{impact}</div>
           ) : null}
@@ -144,6 +201,23 @@ function ElementPageInner() {
         category={element.category}
         description={element.description}
         supports={guidance?.supports ?? []}
+        excellence={
+          loading ? null : (
+            <ElementExcellence
+              ownerHint
+              sources={items.map((item) => ({
+                id: item.id,
+                title: item.approvedContent?.title || item.originalFileName,
+                highlight: item.approvedContent?.highlight,
+              }))}
+              requirements={{ done: completedRequirementIds.size, total: requirements.length }}
+              onOpenEvidence={(id) => {
+                const found = items.find((entry) => entry.id === id);
+                if (found) openReport(found);
+              }}
+            />
+          )
+        }
         evidence={evidence}
         loading={loading}
         crumbs={[
@@ -180,6 +254,25 @@ function ElementPageInner() {
       <Link className="ath-cta no-print" href="/evidence/new">
         <Icon name="plus" size={22} /> إضافة شاهد
       </Link>
+      {report ? (
+        <EvidenceReport
+          item={report.data}
+          allowDownload
+          meta={{
+            ownerName: owner.name,
+            ministry: owner.ministry,
+            school: owner.school,
+            department: owner.department,
+            principalName: owner.principal,
+            academicYear: items.find((entry) => entry.id === report.data.id)?.academicYear,
+          }}
+          onClose={() => setReport(null)}
+          onOpenAttachment={(index) => {
+            const link = report.links[index];
+            if (link) window.open(link, "_blank", "noopener");
+          }}
+        />
+      ) : null}
     </AthShell>
   );
 }

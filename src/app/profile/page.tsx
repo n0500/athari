@@ -5,6 +5,7 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { AthShell, Glyph, Notice, Panel } from "@/components/athari-ui/Ui";
 import { ProfessionalIdentityCard } from "@/components/ProfessionalIdentityCard";
+import { ProfessionalDocumentsPanel } from "@/components/ProfessionalDocumentsPanel";
 import { requireAuth } from "@/lib/firebase";
 import {
   EMPTY_PROFESSIONAL_PROFILE,
@@ -24,6 +25,11 @@ function lines(value: string) {
 function unique(items: string[]) {
   return [...new Set(items.map((item) => item.trim()).filter(Boolean))];
 }
+
+const SUGGESTED_VISION =
+  "تعليمٌ ملهِمٌ ذو جودةٍ عالية، يُعِدّ جيلًا واثقًا بقدراته، معتزًّا بقيمه وهويته الوطنية، متمكّنًا من المعرفة والمهارة، قادرًا على المنافسة عالميًا والإسهام في بناء وطنه.";
+const SUGGESTED_MISSION =
+  "أقدّم تعليمًا نوعيًا يراعي الفروق الفردية، ويجعل المتعلّم محور العملية التعليمية، في بيئةٍ آمنةٍ محفّزة على التفكير والإبداع. وأوظّف الابتكار والممارسات التربوية الحديثة لتحقيق أثرٍ مستدام، وأحرص على التطوير المهني المستمر، وأبني شراكةً فاعلة مع المجتمع التعليمي والأسرة، إسهامًا في تحقيق مستهدفات رؤية المملكة العربية السعودية ٢٠٣٠.";
 
 const GOAL_OPTIONS = [
   "تعزيز التنوع في استراتيجيات التدريس بما يلائم حاجات المتعلمين.",
@@ -157,7 +163,7 @@ export default function ProfessionalProfilePage() {
 
       {!loading ? (
         <>
-          <ProfessionalIdentityCard profile={preview} fallbackName={user?.displayName?.trim() || ""} />
+          <ProfessionalIdentityCard profile={preview} fallbackName={user?.displayName?.trim() || ""} showName />
 
           <Panel
             icon={<Glyph name="user" size={22} />}
@@ -169,9 +175,10 @@ export default function ProfessionalProfilePage() {
               <div className="ath-field"><label>التخصص</label><input value={profile.specialization} onChange={(e) => field("specialization", e.target.value)} /></div>
               <div className="ath-field"><label>المؤهل العلمي</label><input value={profile.qualification} onChange={(e) => field("qualification", e.target.value)} /></div>
               <div className="ath-field"><label>جهة التخرج</label><input value={profile.university} onChange={(e) => field("university", e.target.value)} /></div>
-              <div className="ath-field"><label>جهة العمل</label><input value={profile.employer} onChange={(e) => field("employer", e.target.value)} /></div>
-              <div className="ath-field"><label>المدرسة</label><input value={profile.school} onChange={(e) => field("school", e.target.value)} /></div>
-              <div className="ath-field"><label>الإدارة التعليمية</label><input value={profile.educationDepartment} onChange={(e) => field("educationDepartment", e.target.value)} /></div>
+              <div className="ath-field"><label>جهة العمل</label><input value={profile.employer} onChange={(e) => field("employer", e.target.value)} placeholder="وزارة التعليم" /></div>
+              <div className="ath-field"><label>الإدارة التعليمية</label><input value={profile.educationDepartment} onChange={(e) => field("educationDepartment", e.target.value)} placeholder="مثال: إدارة التعليم بمنطقة القصيم" /></div>
+              <div className="ath-field"><label>اسم المدرسة كاملًا</label><input value={profile.school} onChange={(e) => field("school", e.target.value)} placeholder="كما يُكتب في الخطابات الرسمية" /></div>
+              <div className="ath-field"><label>اسم مديرة المدرسة</label><input value={profile.principalName ?? ""} onChange={(e) => field("principalName", e.target.value)} placeholder="يظهر أسفل تقارير الشواهد" /></div>
               <div className="ath-field"><label>الرتبة المهنية</label><input value={profile.professionalRank} onChange={(e) => field("professionalRank", e.target.value)} /></div>
               <div className="ath-field"><label>سنوات الخبرة</label><input value={profile.experience} onChange={(e) => field("experience", e.target.value)} placeholder="مثال: أكثر من 14 عامًا" /></div>
               <div className="ath-field"><label>الرخصة المهنية</label><input value={profile.professionalLicense} onChange={(e) => field("professionalLicense", e.target.value)} /></div>
@@ -188,6 +195,33 @@ export default function ProfessionalProfilePage() {
                 style={{ minHeight: 120 }}
               />
               <small className="ath-fine">{profile.bio.length}/500</small>
+            </div>
+          </Panel>
+
+          <Panel icon={<Glyph name="eye" size={22} />} title="الرؤية والرسالة" sub="رؤيتك ورسالتك التعليمية، وتظهر للمديرة بعد النبذة.">
+            {!profile.vision && !profile.mission ? (
+              <div className="ath-actions" style={{ marginBottom: 10 }}>
+                <button
+                  type="button"
+                  className="ath-btn outline fit"
+                  onClick={() => {
+                    field("vision", SUGGESTED_VISION);
+                    field("mission", SUGGESTED_MISSION);
+                  }}
+                >
+                  <Glyph name="sparkle" size={17} /> إدراج صيغة مقترحة
+                </button>
+              </div>
+            ) : null}
+            <div className="ath-field">
+              <label htmlFor="pf-vision">رؤيتي</label>
+              <textarea id="pf-vision" value={profile.vision ?? ""} onChange={(e) => field("vision", e.target.value)} maxLength={300} rows={3} placeholder="ما الذي تطمحين إلى تحقيقه في التعليم؟ جملة واحدة موجزة." />
+              <small className="ath-fine">{(profile.vision ?? "").length}/300</small>
+            </div>
+            <div className="ath-field">
+              <label htmlFor="pf-mission">رسالتي</label>
+              <textarea id="pf-mission" value={profile.mission ?? ""} onChange={(e) => field("mission", e.target.value)} maxLength={700} rows={5} placeholder="كيف تحققين رؤيتك؟ الممارسات والقيم التي تلتزمين بها." />
+              <small className="ath-fine">{(profile.mission ?? "").length}/700</small>
             </div>
           </Panel>
 
@@ -261,6 +295,8 @@ export default function ProfessionalProfilePage() {
           <button type="button" className="ath-btn primary block" onClick={save} disabled={saving}>
             <Glyph name="check" /> {saving ? "جاري الحفظ…" : "حفظ الهوية المهنية"}
           </button>
+
+          {user ? <ProfessionalDocumentsPanel uid={user.uid} /> : null}
         </>
       ) : null}
     </AthShell>

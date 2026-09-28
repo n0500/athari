@@ -25,6 +25,8 @@ export type AiAnalysis = {
   draftTitle: string;
   draftDescription: string;
   draftImpact: string;
+  /** One sentence that highlights the teacher's effort, from documented facts only. */
+  draftHighlight?: string;
   missingInformation: MissingInformation;
   warnings: string[];
   unreadableFiles?: string[];
@@ -46,6 +48,8 @@ export type ApprovedContent = {
   title: string;
   description: string;
   impact: string;
+  /** Teacher-approved sentence that highlights the effort behind the evidence. */
+  highlight?: string;
 };
 
 export type EvidenceAttachment = {
@@ -109,6 +113,20 @@ export type FrameworkElement = {
   requirements?: FrameworkRequirement[];
 };
 
+export type ProfessionalDocumentKind = "license" | "timetable" | "curriculum" | "other";
+
+/** A standing document (license, timetable…) kept once in the teacher's profile. */
+export type ProfessionalDocument = {
+  id: string;
+  kind: ProfessionalDocumentKind;
+  label: string;
+  originalFileName: string;
+  mimeType: string;
+  driveFileId: string;
+  driveWebViewLink?: string;
+  showToPrincipal: boolean;
+};
+
 export type ProfessionalProfile = {
   fullName: string;
   specialization: string;
@@ -117,10 +135,15 @@ export type ProfessionalProfile = {
   employer: string;
   school: string;
   educationDepartment: string;
+  /** Name of the school principal, shown at the foot of evidence reports. */
+  principalName?: string;
   professionalRank: string;
   experience: string;
   professionalLicense: string;
   bio: string;
+  /** The teacher's own educational vision and mission. */
+  vision?: string;
+  mission?: string;
   achievements: string[];
   developmentGoals: string[];
 };
