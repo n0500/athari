@@ -228,9 +228,9 @@
 .ev-report-gallery > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .ev-report-gallery figure.is-clickable { cursor: zoom-in; }
 .ev-report-gallery figure { margin: 0; border: 1px solid #e3eaf3; border-radius: 12px; overflow: hidden; background: #f4f8fc; aspect-ratio: 4 / 3; max-width: 100%; }
-.ev-report-gallery img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ev-report-gallery img { width: 100%; height: 100%; object-fit: contain; display: block; background: #fff; }
 
-/* ---------- «تنزيل PDF»: print the evidence report alone on A4 ---------- */
+/* ---------- «طباعة / حفظ PDF»: print the evidence report alone on A4 ---------- */
 @media print {
   @page { size: A4; margin: 14mm 14mm 16mm; }
   body.print-evidence-report { background: #fff !important; }
@@ -255,7 +255,7 @@
   body.print-evidence-report .ev-signatures { margin: 22px 0 0 !important; break-inside: avoid; }
   body.print-evidence-report .ev-issued { margin: 10px 0 0 !important; }
 
-  body.print-evidence-report }
+}
 
 /* Element-level excellence indicators */
 .ath .el-excel, .el-excel { background: linear-gradient(135deg, #fff8e6, #fffdf7); border: 1px solid #f3dca8; border-radius: 18px; padding: 16px 18px; margin: 14px 0; }

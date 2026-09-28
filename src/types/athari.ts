@@ -124,7 +124,6 @@ export type ProfessionalDocument = {
   mimeType: string;
   driveFileId: string;
   driveWebViewLink?: string;
-  showToPrincipal: boolean;
 };
 
 export type ProfessionalProfile = {

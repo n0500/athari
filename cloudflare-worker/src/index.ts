@@ -238,12 +238,19 @@ async function fileToMarkdown(file: File, env: Env) {
 const MAX_INDICATOR_INPUT = 12000;
 
 function cleanIndicatorLines(value: unknown) {
-  return asString(value)
+  const lines = asString(value)
     .split(/\n+/)
-    .map((line) => line.replace(/^[\s•\-–*·◆\d.)]+/, "").trim())
+    .map((line) => line.replace(/^\s*(?:[•\-–*·◆]\s*|[0-9٠-٩]+[.)]\s*)/, "").trim())
     .filter((line) => line.length > 0 && line.length <= 200)
-    .slice(0, 3)
-    .join("\n");
+    .slice(0, 3);
+
+  const kept: string[] = [];
+  for (const line of lines) {
+    const next = [...kept, line].join("\n");
+    if (next.length > 400) break;
+    kept.push(line);
+  }
+  return kept.join("\n");
 }
 
 /**

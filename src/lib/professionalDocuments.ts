@@ -36,7 +36,6 @@ export function normalizeProfessionalDocuments(value: unknown): ProfessionalDocu
       mimeType: asText(raw.mimeType),
       driveFileId,
       ...(asText(raw.driveWebViewLink) ? { driveWebViewLink: asText(raw.driveWebViewLink) } : {}),
-      showToPrincipal: raw.showToPrincipal !== false,
     });
   }
   return list.slice(0, DOCUMENT_SLOTS.length + MAX_OTHER_DOCUMENTS);

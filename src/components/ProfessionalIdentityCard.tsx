@@ -142,7 +142,7 @@ export function ProfessionalIdentityCard({
   ) : null;
 
   const tabs = [
-    { key: "about" as const, label: "الرؤية والرسالة", has: Boolean(p?.bio || p?.vision || p?.mission), body: about },
+    { key: "about" as const, label: p?.vision || p?.mission ? "الرؤية والرسالة" : "النبذة", has: Boolean(p?.bio || p?.vision || p?.mission), body: about },
     { key: "data" as const, label: "البيانات", has: Boolean(data), body: data },
     { key: "achievements" as const, label: "المنجزات", has: Boolean(achievements.length || goals.length), body: achievementsBlock },
     { key: "documents" as const, label: "الوثائق", has: Boolean(documents.length), body: documentsBlock },

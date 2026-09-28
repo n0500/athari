@@ -44,7 +44,6 @@ import {
   ApprovedClassification,
   EvidenceAttachment,
   EvidenceRecord,
-  ProfessionalDocument,
   ProfessionalProfile,
 } from "@/types/athari";
 
@@ -112,7 +111,6 @@ export default function PortfolioPage() {
   const [items, setItems] = useState<EvidenceRecord[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [professionalProfile, setProfessionalProfile] = useState<ProfessionalProfile | null>(null);
-  const [documents, setDocuments] = useState<ProfessionalDocument[]>([]);
   const [loading, setLoading] = useState(firebaseConfigured);
   const [error, setError] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
@@ -152,13 +150,11 @@ export default function PortfolioPage() {
 
       try {
         setError("");
-        const [all, activeShare, profile, savedDocuments] = await Promise.all([
+        const [all, activeShare, profile] = await Promise.all([
           listUserEvidence(nextUser.uid),
           getActivePortfolioShare(nextUser.uid).catch(() => null),
           getProfessionalProfile(nextUser.uid).catch(() => null),
-          getProfessionalDocuments(nextUser.uid).catch(() => []),
         ]);
-        setDocuments(orderedDocuments(savedDocuments).filter((entry) => entry.showToPrincipal));
 
         setItems(all.filter((item) => item.status === "approved"));
         setProfessionalProfile(profile);
@@ -207,19 +203,6 @@ export default function PortfolioPage() {
   const year = process.env.NEXT_PUBLIC_ATHARI_ACADEMIC_YEAR || "1448هـ";
   const totalElements = OFFICIAL_TEACHER_FRAMEWORK_V2.length;
 
-  const driveFileIds = useMemo(
-    () => [
-      ...new Set(
-        items.flatMap((item) =>
-          attachmentsFor(item)
-            .map((attachment) => attachment.driveFileId)
-            .filter((value): value is string => Boolean(value))
-        ).concat(documents.map((entry) => entry.driveFileId))
-      ),
-    ],
-    [items, documents]
-  );
-
   async function copyShareLink(url: string) {
     try {
       await navigator.clipboard.writeText(url);
@@ -234,8 +217,8 @@ export default function PortfolioPage() {
 
     const ok = window.confirm(
       shareUrl
-        ? "تحديث مشاركة ملف الأداء بالشواهد المعتمدة الحالية؟"
-        : "إنشاء رابط لمشاركة ملف الأداء؟ يعرض الرابط الهوية المهنية والشواهد المعتمدة فقط دون الوصول إلى بقية ملفاتك."
+        ? "تحديث مشاركة ملف الأداء بالشواهد المعتمدة والوثائق المهنية الحالية؟"
+        : "إنشاء رابط لمشاركة ملف الأداء؟ يعرض الرابط الهوية المهنية والشواهد المعتمدة وجميع الوثائق المهنية الحالية دون الوصول إلى بقية ملفاتك."
     );
     if (!ok) return;
 
@@ -243,13 +226,35 @@ export default function PortfolioPage() {
       setShareBusy(true);
       setShareMessage("");
 
+      // Re-read professional documents at the moment of sharing. Never rely on a
+      // possibly failed/stale page-load snapshot, because that could accidentally
+      // remove documents from the principal's existing share.
+      let latestDocuments: Awaited<ReturnType<typeof getProfessionalDocuments>>;
+      try {
+        latestDocuments = orderedDocuments(await getProfessionalDocuments(user.uid));
+      } catch {
+        throw new Error("PROFESSIONAL_DOCUMENTS_READ_FAILED");
+      }
+      const shareDocuments = latestDocuments;
+      const currentFileIds = [
+        ...new Set(
+          items
+            .flatMap((item) =>
+              attachmentsFor(item)
+                .map((attachment) => attachment.driveFileId)
+                .filter((value): value is string => Boolean(value))
+            )
+            .concat(shareDocuments.map((entry) => entry.driveFileId))
+        ),
+      ];
+
       const token = await ensureDriveAccessToken();
       const currentShare = await getActivePortfolioShare(user.uid).catch(() => null);
       const previousPermissions = currentShare?.drivePermissions ?? sharePermissions;
 
-      const published = await publishPortfolioFiles(token, driveFileIds, previousPermissions);
+      const published = await publishPortfolioFiles(token, currentFileIds, previousPermissions);
 
-      const currentIds = new Set(driveFileIds);
+      const currentIds = new Set(currentFileIds);
       const removedPermissions = previousPermissions.filter(
         (permission) => !currentIds.has(permission.driveFileId)
       );
@@ -263,7 +268,7 @@ export default function PortfolioPage() {
           evidence: shareEvidenceFor(items),
           drivePermissions: [...published, ...removedPermissions],
           ...(professionalProfile ? { professionalProfile } : {}),
-          documents: documents.map((entry) => ({
+          documents: shareDocuments.map((entry) => ({
             kind: entry.kind,
             label: entry.label,
             originalFileName: entry.originalFileName,
@@ -300,6 +305,8 @@ export default function PortfolioPage() {
       setShareMessage(
         raw === "DRIVE_RECONNECT_REQUIRED"
           ? "يرجى تسجيل الدخول إلى Google ثم إعادة المحاولة."
+          : raw === "PROFESSIONAL_DOCUMENTS_READ_FAILED"
+          ? "تعذر قراءة الوثائق المهنية الآن؛ لم يتم تغيير رابط المشاركة الحالي أو صلاحياته."
           : "تعذر حفظ المشاركة الآن، ولم تُمنح أي صلاحية جديدة على ملفاتك."
       );
     } finally {

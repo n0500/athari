@@ -32,9 +32,11 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [otherLabel, setOtherLabel] = useState("");
-  const [changed, setChanged] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const targetRef = useRef<Target | null>(null);
+  // Professional-document writes replace the whole saved list. Serialize mutations so
+  // a second quick action cannot save an older snapshot over the first one.
+  const mutationLockRef = useRef(false);
 
   useEffect(() => {
     getProfessionalDocuments(uid)
@@ -49,12 +51,12 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
   async function persist(next: ProfessionalDocument[], success: string) {
     const saved = await saveProfessionalDocuments(uid, next);
     setDocuments(orderedDocuments(saved));
-    setChanged(true);
     setIsError(false);
-    setMessage(success);
+    setMessage(`${success} سيظهر التغيير للمديرة عند إنشاء المشاركة أو الضغط على «تحديث المشاركة».`);
   }
 
   function pick(target: Target) {
+    if (mutationLockRef.current) return;
     targetRef.current = target;
     setMessage("");
     inputRef.current?.click();
@@ -72,6 +74,8 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
     }
 
     const key = target.replaceId ?? target.kind;
+    if (mutationLockRef.current) return;
+    mutationLockRef.current = true;
     try {
       setBusyKey(key);
       setMessage("");
@@ -88,7 +92,6 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
         mimeType: file.type || uploaded.mimeType || "",
         driveFileId: uploaded.id,
         ...(uploaded.webViewLink ? { driveWebViewLink: uploaded.webViewLink } : {}),
-        showToPrincipal: previous?.showToPrincipal ?? true,
       };
       const next = previous
         ? documents.map((item) => (item.id === previous.id ? entry : item))
@@ -104,27 +107,15 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
           : "تعذر رفع الوثيقة الآن. حاولي مرة أخرى."
       );
     } finally {
-      setBusyKey("");
-    }
-  }
-
-  async function toggle(entry: ProfessionalDocument) {
-    try {
-      setBusyKey(entry.id);
-      await persist(
-        documents.map((item) => (item.id === entry.id ? { ...item, showToPrincipal: !item.showToPrincipal } : item)),
-        entry.showToPrincipal ? `أُخفيت «${entry.label}» عن المديرة.` : `ستظهر «${entry.label}» للمديرة.`
-      );
-    } catch {
-      setIsError(true);
-      setMessage("تعذر حفظ التغيير الآن.");
-    } finally {
+      mutationLockRef.current = false;
       setBusyKey("");
     }
   }
 
   async function remove(entry: ProfessionalDocument) {
+    if (mutationLockRef.current) return;
     if (!window.confirm(`إزالة «${entry.label}» من الوثائق المهنية؟ يبقى الملف محفوظًا في Google Drive.`)) return;
+    mutationLockRef.current = true;
     try {
       setBusyKey(entry.id);
       await persist(documents.filter((item) => item.id !== entry.id), `أُزيلت «${entry.label}».`);
@@ -132,6 +123,7 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
       setIsError(true);
       setMessage("تعذر حفظ التغيير الآن.");
     } finally {
+      mutationLockRef.current = false;
       setBusyKey("");
     }
   }
@@ -150,14 +142,10 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
           )}
         </div>
         <div className="pd-actions">
-          <label className="pd-switch">
-            <input type="checkbox" checked={entry.showToPrincipal} disabled={busy} onChange={() => toggle(entry)} />
-            <span>إظهار للمديرة</span>
-          </label>
-          <button type="button" disabled={busy} onClick={() => pick({ kind: entry.kind, label: entry.label, replaceId: entry.id })}>
+          <button type="button" disabled={Boolean(busyKey)} onClick={() => pick({ kind: entry.kind, label: entry.label, replaceId: entry.id })}>
             <Glyph name="upload" size={14} />{busy ? "…" : "استبدال"}
           </button>
-          <button type="button" className="danger" disabled={busy} onClick={() => remove(entry)} aria-label={`إزالة ${entry.label}`}>
+          <button type="button" className="danger" disabled={Boolean(busyKey)} onClick={() => remove(entry)} aria-label={`إزالة ${entry.label}`}>
             <Glyph name="trash" size={14} />
           </button>
         </div>
@@ -171,7 +159,7 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
     <Panel
       icon={<Glyph name="folder" size={22} />}
       title="الوثائق المهنية"
-      sub="وثائق ثابتة تُرفع مرة واحدة، وتظهر للمديرة بعد الهوية المهنية."
+      sub="وثائق ثابتة تُرفع مرة واحدة، وتظهر جميعها للمديرة عند إنشاء المشاركة أو تحديثها."
     >
       <input
         ref={inputRef}
@@ -208,7 +196,7 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
             <div className="pd-other">
               <label htmlFor="pd-other-label" className="v7-inline">
                 وثيقة أخرى
-                <InfoTip text="مثل السيرة الذاتية أو شهادة تقدير. اكتبي اسم الوثيقة كما تريدين أن يظهر للمديرة، ثم ارفعي الملف." />
+                <InfoTip text="مثل السيرة الذاتية أو شهادة تقدير. اكتبي اسم الوثيقة كما تريدين أن يظهر في ملف الأداء، ثم ارفعي الملف." />
               </label>
               <div className="pd-other-row">
                 <input
@@ -232,9 +220,6 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
       )}
 
       {message ? <Notice tone={isError ? "error" : "info"}>{message}</Notice> : null}
-      {changed && !isError ? (
-        <p className="ath-fine">لتظهر التغييرات في رابط المديرة، اضغطي «تحديث المشاركة» في صفحة ملف الأداء.</p>
-      ) : null}
       <p className="ath-fine">تُحفظ الملفات في مجلد «أثري / الوثائق المهنية» في Google Drive الخاص بك.</p>
     </Panel>
   );

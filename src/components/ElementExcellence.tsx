@@ -13,20 +13,18 @@ type Indicator = { text: string; evidence?: { id: string; title: string } };
 export function splitIndicators(text?: string) {
   return (text ?? "")
     .split(/\n+/)
-    .map((line) => line.replace(/^[\s•\-–*·◆]+/, "").trim())
+    .map((line) => line.replace(/^\s*(?:[•\-–*·◆]\s*|[0-9٠-٩]+[.)]\s*)/, "").trim())
     .filter(Boolean);
 }
 
 /**
  * Element-level excellence indicators, rebuilt on every render from the
  * approved evidence currently linked to the element. Nothing is stored, so the
- * list follows approvals, archiving and deletion automatically, and every line
- * is either the teacher's approved wording or a count taken from the data.
+ * list follows approvals, archiving and deletion automatically. Only wording
+ * explicitly approved as an excellence indicator is shown here; completion
+ * counts belong to the separate documentation-status UI.
  */
-export function buildIndicators(
-  sources: ExcellenceSource[],
-  requirements: { done: number; total: number }
-): Indicator[] {
+export function buildIndicators(sources: ExcellenceSource[]): Indicator[] {
   const seen = new Set<string>();
   const list: Indicator[] = [];
 
@@ -39,28 +37,19 @@ export function buildIndicators(
     }
   }
 
-  if (requirements.total > 0 && requirements.done === requirements.total) {
-    list.push({ text: "جميع بنود المتابعة الإلزامية لهذا العنصر موثقة بشواهد معتمدة." });
-  }
-  if (sources.length >= 3) {
-    list.push({ text: `يدعم العنصر ${sources.length} شواهد معتمدة.` });
-  }
-
   return list;
 }
 
 export function ElementExcellence({
   sources,
-  requirements,
   onOpenEvidence,
   ownerHint = false,
 }: {
   sources: ExcellenceSource[];
-  requirements: { done: number; total: number };
   onOpenEvidence?: (id: string) => void;
   ownerHint?: boolean;
 }) {
-  const indicators = buildIndicators(sources, requirements);
+  const indicators = buildIndicators(sources);
 
   if (!indicators.length) {
     return ownerHint && sources.length ? (

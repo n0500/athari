@@ -123,8 +123,12 @@ function ReviewInner() {
         setImpact(
           record?.approvedContent?.impact ?? record?.aiAnalysis?.draftImpact ?? ""
         );
+        // Once the evidence has approved content, that approved value is authoritative —
+        // including an intentionally empty highlight. Do not resurrect the AI draft after deletion.
         setHighlight(
-          record?.approvedContent?.highlight ?? record?.aiAnalysis?.draftHighlight ?? ""
+          record?.approvedContent
+            ? record.approvedContent.highlight ?? ""
+            : record?.aiAnalysis?.draftHighlight ?? ""
         );
       })
       .catch(() => setError("تعذر تحميل الشاهد."))
@@ -143,6 +147,10 @@ function ReviewInner() {
 
   async function handleSuggestIndicators() {
     if (!item || suggesting) return;
+    if (!title.trim() && !description.trim()) {
+      setIndicatorNote("أضيفي عنوان الشاهد أو وصف التنفيذ أولًا، ثم اطلبي الاقتراح.");
+      return;
+    }
     if (highlight.trim() && !window.confirm("سيُستبدل النص الحالي في حقل مؤشرات التميّز بالاقتراح الجديد. هل تريدين المتابعة؟")) return;
     setSuggesting(true);
     setIndicatorNote("");
@@ -158,7 +166,7 @@ function ReviewInner() {
           : approvedNames,
       });
       if (result) {
-        setHighlight(result);
+        setHighlight(result.slice(0, 400));
         setIndicatorNote("أُضيف الاقتراح. راجعيه وعدّليه قبل الحفظ.");
       } else {
         setIndicatorNote("لم يجد أثري في بيانات هذا الشاهد ما يدعم مؤشر تميّز. يمكنك إضافة وصف أدق ثم المحاولة مرة أخرى.");
@@ -284,7 +292,8 @@ function ReviewInner() {
         title: title.trim(),
         description: description.trim(),
         impact: impact.trim(),
-        ...(highlight.trim() ? { highlight: highlight.trim() } : {}),
+        // Store the empty string too, so deleting all indicators remains an explicit choice.
+        highlight: highlight.trim(),
       };
 
       await approveEvidenceLinkedSafe(id, approved, movedParentId);
@@ -473,7 +482,7 @@ function ReviewInner() {
         <div className="ath-field">
           <label htmlFor="ev-highlight" className="v7-inline">
             مؤشرات التميّز (اختياري)
-            <InfoTip text="نقطة أو نقطتان، كل نقطة في سطر: ابتكار، أو اتساع الأثر، أو نتيجة موثقة، أو نقل التجربة. تُجمع تلقائيًا في صفحة عنصر التقييم مع رابط لهذا الشاهد، وتُكتب مما يثبته الشاهد فقط. تُكتب مما يثبته الشاهد فقط." />
+            <InfoTip text="اكتبي فقط ما يثبت تميزا يتجاوز المتطلب الأساسي، مثل ابتكار موثق، أو اتساع الأثر، أو نتيجة قابلة للقياس، أو استدامة ونقل للتجربة. كل مؤشر في سطر، ويجب أن يكون مدعوما بالشاهد نفسه." />
           </label>
           <textarea id="ev-highlight" rows={4} maxLength={400} value={highlight} onChange={(event) => setHighlight(event.target.value)} placeholder={"مثال:\nأول تطبيق لهذه الاستراتيجية في مقررات الصف الأول الثانوي بالمدرسة.\nنُقلت التجربة لزميلات القسم عبر ورشة تطبيقية."} />
           <div className="rv-suggest">

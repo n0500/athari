@@ -68,6 +68,21 @@ export default function PublicSharePage() {
   const [report, setReport] = useState<ShareEvidence | null>(null);
 
   useEffect(() => {
+    if (!viewer) return;
+
+    const closeViewerFirst = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setViewer(null);
+    };
+
+    // Capture phase runs before EvidenceReport's document-level Escape handler.
+    window.addEventListener("keydown", closeViewerFirst, true);
+    return () => window.removeEventListener("keydown", closeViewerFirst, true);
+  }, [viewer]);
+
+  useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("token") ?? "";
 
     if (!token) {
@@ -191,6 +206,7 @@ export default function PublicSharePage() {
   const activeCompleted = activeGroup
     ? completedRequirementsForElement(activeGroup.evidence, activeGroup.element.id)
     : new Set<string>();
+  const reportEvidence = activeGroup ? activeGroup.evidence : allEvidence;
 
   return (
     <>
@@ -211,7 +227,6 @@ export default function PublicSharePage() {
               excellence={
                 <ElementExcellence
                   sources={activeGroup.evidence.map((item) => ({ id: item.id, title: item.title, highlight: item.highlight }))}
-                  requirements={{ done: activeCompleted.size, total: activeRequirements.length }}
                   onOpenEvidence={(id) => {
                     const found = activeGroup.evidence.find((entry) => entry.id === id);
                     if (found) setReport(found);
@@ -323,14 +338,14 @@ export default function PublicSharePage() {
       {report ? (
         <EvidenceReport
           item={report}
-          position={{ index: Math.max(0, allEvidence.findIndex((entry) => entry.id === report.id)), total: allEvidence.length }}
+          position={{ index: Math.max(0, reportEvidence.findIndex((entry) => entry.id === report.id)), total: reportEvidence.length }}
           onPrev={(() => {
-            const at = allEvidence.findIndex((entry) => entry.id === report.id);
-            return at > 0 ? () => setReport(allEvidence[at - 1]) : undefined;
+            const at = reportEvidence.findIndex((entry) => entry.id === report.id);
+            return at > 0 ? () => setReport(reportEvidence[at - 1]) : undefined;
           })()}
           onNext={(() => {
-            const at = allEvidence.findIndex((entry) => entry.id === report.id);
-            return at >= 0 && at < allEvidence.length - 1 ? () => setReport(allEvidence[at + 1]) : undefined;
+            const at = reportEvidence.findIndex((entry) => entry.id === report.id);
+            return at >= 0 && at < reportEvidence.length - 1 ? () => setReport(reportEvidence[at + 1]) : undefined;
           })()}
           meta={{
             ownerName: share.professionalProfile?.fullName || share.ownerDisplayName,

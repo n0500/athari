@@ -210,7 +210,6 @@ function ElementPageInner() {
                 title: item.approvedContent?.title || item.originalFileName,
                 highlight: item.approvedContent?.highlight,
               }))}
-              requirements={{ done: completedRequirementIds.size, total: requirements.length }}
               onOpenEvidence={(id) => {
                 const found = items.find((entry) => entry.id === id);
                 if (found) openReport(found);

@@ -165,6 +165,19 @@ export async function createOrUpdatePortfolioShare(input: {
   return { id: shareId };
 }
 
+export async function updatePortfolioShareDocuments(
+  shareId: string,
+  documents: ShareDocument[],
+  drivePermissions: ShareDrivePermission[]
+) {
+  if (!shareId) return;
+  await updateDoc(doc(requireDb(), "publicShares", shareId), {
+    documents: normalizeShareDocuments(documents),
+    drivePermissions,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function revokePortfolioShare(uid: string, shareId: string) {
   await updateDoc(doc(requireDb(), "publicShares", shareId), {
     active: false,

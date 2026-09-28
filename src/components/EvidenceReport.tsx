@@ -46,7 +46,7 @@ function thumbnailUrl(fileId: string) {
 
 /**
  * A readable report for one approved evidence, built only from approved content.
- * «تنزيل PDF» prints the report alone on A4 (the browser's «حفظ بصيغة PDF»).
+ * «طباعة / حفظ PDF» prints the report alone on A4 using the browser print dialog.
  */
 export function EvidenceReport({
   item,
@@ -151,7 +151,7 @@ export function EvidenceReport({
           ) : <span className="ev-report-label">تقرير الشاهد</span>}
           {allowDownload ? (
             <button type="button" className="ev-report-pdf" onClick={downloadPdf}>
-              <Glyph name="download" size={17} />تنزيل PDF
+              <Glyph name="download" size={17} />طباعة / حفظ PDF
             </button>
           ) : <span className="ev-report-spacer" />}
         </header>
@@ -159,7 +159,7 @@ export function EvidenceReport({
         {/* Official letterhead: shown on screen and in print */}
         <div className="ev-letterhead">
           <div className="ev-letterhead-org">
-            <strong>{meta.ministry || "وزارة التعليم"}</strong>
+            <strong>وزارة التعليم</strong>
             {meta.department ? <span>{meta.department}</span> : null}
             {meta.school ? <span>{meta.school}</span> : null}
           </div>
