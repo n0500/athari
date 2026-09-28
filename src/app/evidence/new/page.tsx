@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import {
   AthShell,
@@ -47,7 +47,7 @@ import {
 } from "@/lib/firestore";
 import { analyzeEvidence } from "@/lib/ai";
 import { requirementsForElement } from "@/data/mandatory-requirements";
-import { DriveSourceLink, EvidenceAttachment } from "@/types/athari";
+import { AiAnalysis, DriveSourceLink, EvidenceAttachment } from "@/types/athari";
 import { InfoTip } from "@/components/InfoTip";
 
 const MAX_FILES = 8;
@@ -61,7 +61,6 @@ const ACCEPTED = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 
-type SourceMode = "standard" | "folder_batch";
 
 function isAccepted(file: File) {
   if (file.type && ACCEPTED.includes(file.type)) return true;
@@ -113,13 +112,91 @@ function driveErrorMessage(raw: string) {
     : raw;
 }
 
+
+function folderEvidenceTitle(folderName: string, aiTitle: string) {
+  const compact = folderName.replace(/[\s_-]+/g, "").toLowerCase();
+  const looksLikeCourses = ["دوراتي", "دورات", "دورة", "تطويرمهني", "تدريب", "شهاداتدورات"].some(
+    (term) => compact.includes(term)
+  );
+  if (looksLikeCourses) return "التطوير المهني";
+  return aiTitle.trim() || folderName.trim() || "شاهد مجلد مرتبط";
+}
+
+function mergeFolderAnalysis(
+  previous: AiAnalysis | undefined,
+  incoming: AiAnalysis,
+  preferredTitle: string
+): AiAnalysis {
+  const facts = [...(previous?.extractedFacts ?? []), ...(incoming.extractedFacts ?? [])];
+  const seenFacts = new Set<string>();
+  const extractedFacts = facts.filter((entry) => {
+    const key = entry.fact.trim();
+    if (!key || seenFacts.has(key)) return false;
+    seenFacts.add(key);
+    return true;
+  });
+
+  const suggestionMap = new Map<string, AiAnalysis["suggestedClassifications"][number]>();
+  for (const suggestion of [
+    ...(incoming.suggestedClassifications ?? []),
+    ...(previous?.suggestedClassifications ?? []),
+  ]) {
+    const current = suggestionMap.get(suggestion.elementId);
+    if (!current) {
+      suggestionMap.set(suggestion.elementId, { ...suggestion });
+      continue;
+    }
+    suggestionMap.set(suggestion.elementId, {
+      ...current,
+      reason: current.reason || suggestion.reason,
+      requirementIds: [
+        ...new Set([...(current.requirementIds ?? []), ...(suggestion.requirementIds ?? [])]),
+      ],
+    });
+  }
+
+  const warnings = [
+    ...new Set([...(previous?.warnings ?? []), ...(incoming.warnings ?? [])].filter(Boolean)),
+  ];
+  const unreadableFiles = [
+    ...new Set([
+      ...(previous?.unreadableFiles ?? []),
+      ...(incoming.unreadableFiles ?? []),
+    ]),
+  ];
+
+  return {
+    extractedFacts,
+    suggestedClassifications: [...suggestionMap.values()].slice(0, 3),
+    draftTitle: preferredTitle,
+    draftDescription:
+      previous?.draftDescription?.trim() || incoming.draftDescription?.trim() || "",
+    draftImpact: previous?.draftImpact?.trim() || incoming.draftImpact?.trim() || "",
+    missingInformation: incoming.missingInformation ?? previous?.missingInformation ?? null,
+    warnings,
+    ...(unreadableFiles.length ? { unreadableFiles } : {}),
+  };
+}
+
+async function hashAttachmentSet(attachments: EvidenceAttachment[]) {
+  const hashes = attachments.map((attachment) => attachment.contentHash).filter(Boolean) as string[];
+  if (hashes.length !== attachments.length || !hashes.length) return "";
+  const signature = [...hashes].sort().join("|");
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(signature)
+  );
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export default function NewEvidencePage() {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
   const [linkedDriveItems, setLinkedDriveItems] = useState<DriveFile[]>([]);
   const [linkedSource, setLinkedSource] = useState<DriveSourceLink | null>(null);
   const [linkedFolders, setLinkedFolders] = useState<LinkedDriveFolder[]>([]);
-  const [sourceMode, setSourceMode] = useState<SourceMode>("standard");
   const [sourceLabel, setSourceLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -157,7 +234,6 @@ export default function NewEvidencePage() {
     setLinkedDriveItems([]);
     setLinkedSource(null);
     setSourceLabel("");
-    setSourceMode("standard");
   }
 
   function validateFiles(selected: File[]) {
@@ -200,7 +276,6 @@ export default function NewEvidencePage() {
       setLinkedDriveItems([]);
       setLinkedSource(null);
       setSourceLabel("من الجهاز");
-      setSourceMode("standard");
     } catch (error) {
       clearSelection();
       setMessage(error instanceof Error ? error.message : "تعذر اختيار الملفات.");
@@ -255,7 +330,6 @@ export default function NewEvidencePage() {
             }
           : null
       );
-      setSourceMode("standard");
       setSourceLabel("ملف مرتبط من Google Drive");
       setMessage(
         items.length === 1
@@ -296,7 +370,7 @@ export default function NewEvidencePage() {
       });
       setLinkedFolders(next);
       setMessage(
-        `تم ربط مجلد «${folder.name || picked.name}». عند إضافة شهادات جديدة استخدمي زر «تحديث» بجانبه.`
+        `تم ربط مجلد «${folder.name || picked.name}». عند إضافة ملفات جديدة استخدمي زر «تحديث» بجانبه.`
       );
     } catch (error) {
       const raw = error instanceof Error ? error.message : "UNKNOWN";
@@ -322,7 +396,7 @@ export default function NewEvidencePage() {
       const picked = await pickDriveFiles(token, {
         parentId: folder.id,
         multiple: true,
-        title: `اختاري الشهادات الجديدة من «${folder.name}»`,
+        title: `اختاري الملفات الجديدة من «${folder.name}»`,
       });
       if (!picked.length) {
         setMessage("");
@@ -348,7 +422,7 @@ export default function NewEvidencePage() {
         return;
       }
 
-      setMessage(`جاري تجهيز ${fresh.length} ${fresh.length === 1 ? "شهادة" : "شهادات"} جديدة…`);
+      setMessage(`جاري تجهيز ${fresh.length} ${fresh.length === 1 ? "ملف" : "ملفات"} جديدة…`);
       const { items, downloaded } = await downloadPickedItems(token, fresh);
       const next = await touchLinkedDriveFolder(user.uid, folder.id);
       setLinkedFolders(next);
@@ -360,10 +434,9 @@ export default function NewEvidencePage() {
         name: folder.name,
         ...(folder.webViewLink ? { webViewLink: folder.webViewLink } : {}),
       });
-      setSourceMode("folder_batch");
       setSourceLabel(`مجلد Google Drive: ${folder.name}`);
       setMessage(
-        `${fresh.length} ${fresh.length === 1 ? "شهادة جديدة جاهزة" : "شهادات جديدة جاهزة"} للإضافة كشواهد مستقلة${
+        `${fresh.length} ${fresh.length === 1 ? "ملف جاهز" : "ملفات جاهزة"} للدمج في شاهد واحد خاص بمجلد «${folder.name}»${
           skipped ? ` · تم تجاهل ${skipped} مضافة مسبقًا` : ""
         }.`
       );
@@ -415,86 +488,6 @@ export default function NewEvidencePage() {
     }));
   }
 
-  async function processFolderBatch(user: User, driveToken: string) {
-    if (!linkedSource || linkedSource.kind !== "folder") {
-      throw new Error("FOLDER_SOURCE_REQUIRED");
-    }
-
-    const framework = await frameworkForAnalysis();
-    let completed = 0;
-
-    for (let index = 0; index < files.length; index += 1) {
-      const file = files[index];
-      const source = linkedDriveItems[index];
-      if (!source?.id) continue;
-
-      setMessage(
-        files.length === 1
-          ? "جاري تحليل الشهادة الجديدة…"
-          : `جاري تحليل الشهادة ${index + 1} من ${files.length}…`
-      );
-
-      const { contentHash, fileHashes } = await computeEvidenceBundleHash([file]);
-      const duplicate = await findDuplicateEvidence({
-        uid: user.uid,
-        academicYear,
-        files: [file],
-        contentHash,
-      });
-
-      if (
-        duplicate &&
-        ["approved", "ready_for_review", "needs_info"].includes(duplicate.status)
-      ) {
-        continue;
-      }
-
-      const evidenceId = duplicate?.id ??
-        (await createEvidenceDraft({
-          ownerUid: user.uid,
-          academicYear,
-          files: [file],
-          contentHash,
-          fileHashes,
-        }));
-
-      try {
-        if (duplicate && !duplicate.contentHash) {
-          await setEvidenceContentHash(evidenceId, contentHash);
-        }
-        const attachment: EvidenceAttachment = {
-          attachmentId: duplicate?.attachments?.[0]?.attachmentId ?? newAttachmentId(),
-          originalFileName: source.name || file.name,
-          mimeType: source.mimeType || file.type || "application/octet-stream",
-          fileSize: file.size,
-          contentHash: fileHashes[0],
-          driveFileId: source.id,
-          ...(source.webViewLink ? { driveWebViewLink: source.webViewLink } : {}),
-          driveParentFolderId: linkedSource.id,
-          sourceKind: "drive_link",
-        };
-        await attachDriveFiles(evidenceId, [attachment]);
-        await saveEvidenceDriveSource(evidenceId, linkedSource);
-        await markAnalyzing(evidenceId);
-        const analysis = await analyzeEvidence([file], framework);
-        await saveAnalysis(evidenceId, analysis);
-        completed += 1;
-      } catch (error) {
-        const raw = error instanceof Error ? error.message : "UNKNOWN";
-        await markAnalysisFailed(evidenceId, raw).catch(() => undefined);
-        throw error;
-      }
-    }
-
-    if (!completed) {
-      setMessage("لم تُضف شواهد جديدة لأن الملفات المختارة موجودة مسبقًا في أثري.");
-      setIsError(false);
-      return;
-    }
-
-    router.push("/evidence");
-  }
-
   async function processEvidence() {
     if (!files.length) return;
 
@@ -519,8 +512,81 @@ export default function NewEvidencePage() {
         throw new Error("DRIVE_SIGNIN_REQUIRED");
       }
 
-      if (sourceMode === "folder_batch") {
-        await processFolderBatch(user, driveToken);
+      if (linkedSource?.kind === "folder" && isDriveLinked) {
+        stage = "drive";
+        setMessage(`جاري تحديث شاهد مجلد «${linkedSource.name}»…`);
+
+        const { contentHash, fileHashes } = await computeEvidenceBundleHash(files);
+        const existingItems = await listUserEvidence(user.uid, { includeArchived: true });
+        const folderEvidence = existingItems.find(
+          (item) =>
+            item.status !== "archived" &&
+            item.driveSource?.kind === "folder" &&
+            item.driveSource.id === linkedSource.id
+        );
+
+        const newAttachments: EvidenceAttachment[] = files.map((file, index) => {
+          const source = linkedDriveItems[index];
+          return {
+            attachmentId: newAttachmentId(),
+            originalFileName: source?.name || file.name,
+            mimeType: source?.mimeType || file.type || "application/octet-stream",
+            fileSize: file.size,
+            ...(fileHashes[index] ? { contentHash: fileHashes[index] } : {}),
+            ...(source?.id ? { driveFileId: source.id } : {}),
+            ...(source?.webViewLink ? { driveWebViewLink: source.webViewLink } : {}),
+            driveParentFolderId: linkedSource.id,
+            sourceKind: "drive_link",
+          };
+        });
+
+        let combinedAttachments = newAttachments;
+        if (folderEvidence) {
+          evidenceId = folderEvidence.id;
+          const existingAttachments = folderEvidence.attachments ?? [];
+          const existingDriveIds = new Set(
+            existingAttachments
+              .map((attachment) => attachment.driveFileId)
+              .filter((value): value is string => Boolean(value))
+          );
+          const freshAttachments = newAttachments.filter(
+            (attachment) =>
+              !attachment.driveFileId || !existingDriveIds.has(attachment.driveFileId)
+          );
+          combinedAttachments = [...existingAttachments, ...freshAttachments];
+          await attachDriveFiles(evidenceId, combinedAttachments);
+          await saveEvidenceDriveSource(evidenceId, linkedSource);
+          const mergedHash = await hashAttachmentSet(combinedAttachments);
+          if (mergedHash) await setEvidenceContentHash(evidenceId, mergedHash);
+        } else {
+          evidenceId = await createEvidenceDraft({
+            ownerUid: user.uid,
+            academicYear,
+            files,
+            contentHash,
+            fileHashes,
+          });
+          await attachDriveFiles(evidenceId, newAttachments);
+          await saveEvidenceDriveSource(evidenceId, linkedSource);
+        }
+
+        await markAnalyzing(evidenceId);
+        stage = "analysis";
+        setMessage(`جاري تحليل شاهد مجلد «${linkedSource.name}»…`);
+        const framework = await frameworkForAnalysis();
+        const incoming = await analyzeEvidence(files, framework);
+        const preferredTitle =
+          folderEvidence?.approvedContent?.title?.trim() ||
+          folderEvidence?.aiAnalysis?.draftTitle?.trim() ||
+          folderEvidenceTitle(linkedSource.name, incoming.draftTitle || "");
+        const analysis = mergeFolderAnalysis(
+          folderEvidence?.aiAnalysis,
+          incoming,
+          preferredTitle
+        );
+        await saveAnalysis(evidenceId, analysis);
+
+        router.push(`/evidence/review?id=${encodeURIComponent(evidenceId)}`);
         return;
       }
 
@@ -762,9 +828,9 @@ export default function NewEvidencePage() {
           title={files.length === 1 ? "ملف واحد" : files.length === 2 ? "ملفان" : `${files.length} ملفات`}
           sub={`${formatSize(totalBytes)} إجمالًا · ${sourceLabel || "شاهد واحد"}`}
         >
-          {sourceMode === "folder_batch" ? (
+          {linkedSource?.kind === "folder" ? (
             <Notice>
-              الملفات الجديدة من المجلد ستُنشأ كشواهد مستقلة، حتى تكون كل شهادة دورة قابلة للمراجعة والاعتماد بمفردها.
+              الملفات المختارة من هذا المجلد ستُدمج في شاهد واحد خاص بالمجلد، ويقترح أثري عنوانه وتصنيفه من المحتوى. عند تحديث المجلد تُضاف الملفات الجديدة إلى الشاهد نفسه.
             </Notice>
           ) : isDriveLinked ? (
             <Notice>الملفات مرتبطة من Google Drive وتبقى في موقعها الأصلي. لا ينقلها أثري عند الاعتماد.</Notice>
@@ -798,13 +864,7 @@ export default function NewEvidencePage() {
 
       <button type="button" className="ath-btn primary block" onClick={processEvidence} disabled={!files.length || busy}>
         <Glyph name="sparkle" />
-        {busy
-          ? "جاري الحفظ والتحليل…"
-          : sourceMode === "folder_batch"
-          ? files.length === 1
-            ? "تحليل الشهادة الجديدة"
-            : `تحليل ${files.length} شهادات كشواهد مستقلة`
-          : "حفظ وتحليل الشاهد"}
+        {busy ? "جاري الحفظ والتحليل…" : "حفظ وتحليل الشاهد"}
       </button>
     </AthShell>
   );
