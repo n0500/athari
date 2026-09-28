@@ -6,6 +6,7 @@ export type PickedDriveItem = {
 };
 
 const GOOGLE_FOLDER_MIME = "application/vnd.google-apps.folder";
+const MOBILE_MULTISELECT_LIMIT = 8;
 
 declare global {
   interface Window {
@@ -66,6 +67,15 @@ function pickerConfig() {
   const firebaseAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "";
   const derivedProject = firebaseAppId.split(":")[1] || "";
   return { apiKey, appId: explicitProject || derivedProject };
+}
+
+function isMobilePicker() {
+  if (typeof window === "undefined") return false;
+  const userAgent = window.navigator?.userAgent || "";
+  return (
+    /Android|iPhone|iPad|iPod/i.test(userAgent) ||
+    window.matchMedia?.("(pointer: coarse)")?.matches === true
+  );
 }
 
 function createPicker(
@@ -161,6 +171,34 @@ export async function pickDriveFiles(
   const { apiKey } = pickerConfig();
   if (!apiKey) throw new Error("PICKER_NOT_CONFIGURED");
   await loadPickerApi();
+
+  // Google Picker exposes MULTISELECT_ENABLED, but its mobile web UI may still
+  // complete the picker after one tapped file. On touch/mobile devices Athari
+  // therefore keeps reopening the same folder and accumulates the selections.
+  // The user finishes by closing/cancelling the picker; all chosen files are
+  // then returned together and are processed as one evidence bundle.
+  if (options.multiple && isMobilePicker()) {
+    const selected = new Map<string, PickedDriveItem>();
+
+    while (selected.size < MOBILE_MULTISELECT_LIMIT) {
+      const count = selected.size;
+      const title = count
+        ? `تم اختيار ${count} · اختاري ملفًا آخر أو أغلقي النافذة للانتهاء`
+        : "اختاري ملفًا · سيعود المجلد لإضافة ملفات أخرى";
+
+      const batch = await createPicker(accessToken, {
+        ...options,
+        multiple: false,
+        title,
+      });
+
+      if (!batch.length) break;
+      for (const item of batch) selected.set(item.id, item);
+    }
+
+    return [...selected.values()];
+  }
+
   return createPicker(accessToken, options);
 }
 
