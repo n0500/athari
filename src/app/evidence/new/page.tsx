@@ -67,6 +67,14 @@ function isAccepted(file: File) {
   return /\.(pdf|jpe?g|png|webp|docx)$/i.test(file.name);
 }
 
+function fileKind(file: File): { label: string; tone: string } {
+  const name = file.name.toLowerCase();
+  if (file.type === "application/pdf" || name.endsWith(".pdf")) return { label: "PDF", tone: "pdf" };
+  if (file.type.startsWith("image/") || /\.(jpe?g|png|webp)$/.test(name)) return { label: "صورة", tone: "img" };
+  if (name.endsWith(".docx")) return { label: "Word", tone: "doc" };
+  return { label: "ملف", tone: "other" };
+}
+
 function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -201,6 +209,40 @@ export default function NewEvidencePage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [source, setSourceState] = useState<"device" | "drive" | "folder">("device");
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("athari:add-source");
+      if (saved === "device" || saved === "drive" || saved === "folder") setSourceState(saved);
+    } catch {
+      // storage unavailable: keep the default tab
+    }
+  }, []);
+
+  function setSource(next: "device" | "drive" | "folder") {
+    setSourceState(next);
+    try {
+      window.localStorage.setItem("athari:add-source", next);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Object URLs for image previews, released when the selection changes.
+  const previews = useMemo(
+    () => files.map((file) => (file.type.startsWith("image/") ? URL.createObjectURL(file) : "")),
+    [files]
+  );
+  useEffect(() => () => previews.forEach((url) => url && URL.revokeObjectURL(url)), [previews]);
+
+  // Short confirmations disappear on their own; errors and progress stay.
+  useEffect(() => {
+    if (!message || isError || busy) return;
+    const timer = window.setTimeout(() => setMessage(""), 5000);
+    return () => window.clearTimeout(timer);
+  }, [message, isError, busy]);
   const academicYear =
     process.env.NEXT_PUBLIC_ATHARI_ACADEMIC_YEAR || "1448هـ";
 
@@ -252,13 +294,14 @@ export default function NewEvidencePage() {
     }
   }
 
-  function chooseFiles(list: FileList | null) {
+  function chooseFiles(list: FileList | null, append = false) {
     resetMessages();
-    const selected = Array.from(list ?? []);
-    if (!selected.length) {
-      clearSelection();
-      return;
-    }
+    const incoming = Array.from(list ?? []);
+    if (!incoming.length) return;
+
+    // Adding from the device keeps files already chosen from the device.
+    const keep = append && !linkedDriveItems.length ? files : [];
+    const selected = [...keep, ...incoming];
 
     const unique = selected.filter(
       (file, index, all) =>
@@ -277,7 +320,7 @@ export default function NewEvidencePage() {
       setLinkedSource(null);
       setSourceLabel("من الجهاز");
     } catch (error) {
-      clearSelection();
+      // Keep what was already selected; only the new choice is rejected.
       setMessage(error instanceof Error ? error.message : "تعذر اختيار الملفات.");
       setIsError(true);
     }
@@ -738,116 +781,162 @@ export default function NewEvidencePage() {
     }
   }
 
+  const sources = [
+    { key: "device" as const, label: "من الجهاز", icon: "upload" as const },
+    { key: "drive" as const, label: "من Google Drive", icon: "docOutline" as const },
+    { key: "folder" as const, label: "مجلد مرتبط", icon: "folder" as const },
+  ];
+
   return (
-    <AthShell back={{ href: "/evidence" }} title="إضافة شاهد" subtitle="إضافة ملفات للإنجاز نفسه أو تحديث مجلد مرتبط.">
+    <AthShell back={{ href: "/evidence" }} title="إضافة شاهد" subtitle="إضافة ملفات للإنجاز نفسه.">
       <div className="ath-steps" aria-label="مراحل إضافة الشاهد">
         <span className="on"><b>1</b>اختيار</span>
         <span className={busy ? "on" : ""}><b>2</b>تحليل</span>
         <span><b>3</b>مراجعة</span>
       </div>
 
-      <div className="v7-field-head">
-        <strong>مصدر الشاهد</strong>
-        <InfoTip text="يمكن رفع الملفات من الجهاز، اختيار ملفات من Google Drive، أو ربط مجلد متجدد مثل «دوراتي»." />
-      </div>
+      <section className="ath-panel add-source">
+        <div className="v7-field-head">
+          <strong>مصدر الشاهد</strong>
+          <InfoTip text="يمكن إضافة أكثر من ملف للشاهد نفسه." />
+        </div>
 
-      <div className="ath-actions" style={{ marginBottom: 12 }}>
-        <label className="ath-btn outline fit" style={{ cursor: "pointer" }}>
-          <Glyph name="upload" size={18} /> من الجهاز
-          <input
-            type="file"
-            multiple
-            accept="image/jpeg,image/png,image/webp,.pdf,.docx"
-            onChange={(event) => chooseFiles(event.target.files)}
-            disabled={busy}
-            style={{ display: "none" }}
-          />
-        </label>
-        <button type="button" className="ath-btn outline fit" onClick={chooseFromDrive} disabled={busy}>
-          <Glyph name="docOutline" size={18} /> ملف من Drive
-        </button>
-        <button type="button" className="ath-btn outline fit" onClick={linkNewFolder} disabled={busy}>
-          <Glyph name="folder" size={18} /> ربط مجلد
-        </button>
-      </div>
+        <div className="add-tabs" role="tablist" aria-label="مصدر الشاهد">
+          {sources.map((entry) => (
+            <button
+              key={entry.key}
+              type="button"
+              role="tab"
+              aria-selected={source === entry.key}
+              className={source === entry.key ? "on" : ""}
+              onClick={() => setSource(entry.key)}
+              disabled={busy}
+            >
+              <Glyph name={entry.icon} size={18} />
+              {entry.label}
+            </button>
+          ))}
+        </div>
 
-      {linkedFolders.length ? (
-        <Panel
-          icon={<Glyph name="folder" size={22} />}
-          title="المجلدات المرتبطة"
-          sub="اربطِي المجلد مرة واحدة، ثم استخدمي «تحديث» عند إضافة ملفات جديدة."
-        >
-          <div className="ath-stack">
-            {linkedFolders.map((folder) => (
-              <div className="ath-file-row" key={folder.id}>
-                <span className="ic"><Glyph name="folder" size={18} /></span>
-                <div className="nm">
-                  <strong>{folder.name}</strong>
-                  <span>{folder.lastCheckedAt ? "تمت مراجعته سابقًا" : "مرتبط وجاهز للتحديث"}</span>
-                </div>
-                <button
-                  type="button"
-                  className="ath-mini blue"
-                  onClick={() => refreshFolder(folder)}
-                  disabled={busy}
-                >
-                  تحديث
-                </button>
-                <button
-                  type="button"
-                  className="ath-icon-btn"
-                  onClick={() => unlinkFolder(folder)}
-                  disabled={busy}
-                  aria-label={`إلغاء ربط ${folder.name}`}
-                >
-                  <Glyph name="trash" size={16} />
-                </button>
-              </div>
-            ))}
+        {source === "device" ? (
+          <label
+            className={`ath-drop add-drop ${dragging ? "is-over" : ""} ${files.length && !isDriveLinked ? "is-compact" : ""}`}
+            onDragEnter={() => setDragging(true)}
+            onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(false);
+              chooseFiles(event.dataTransfer.files, true);
+            }}
+          >
+            <input
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp,.pdf,.docx"
+              onChange={(event) => {
+                chooseFiles(event.target.files, true);
+                event.target.value = "";
+              }}
+              disabled={busy}
+            />
+            {files.length && !isDriveLinked ? (
+              <span className="fake"><Glyph name="plus" size={18} />إضافة ملفات أخرى</span>
+            ) : (
+              <>
+                <ElementArt art="planner" className="art" />
+                <strong>اسحبي الملفات هنا أو اختاريها من الجهاز</strong>
+                <span className="fake"><Glyph name="upload" size={18} />اختيار الملفات</span>
+                <small>PDF أو صور أو Word · حتى {MAX_FILES} ملفات · 10 MB لكل ملف</small>
+              </>
+            )}
+          </label>
+        ) : null}
+
+        {source === "drive" ? (
+          <div className="add-option">
+            <p>يبقى الملف في مكانه في Google Drive، ولا ينقله أثري عند الاعتماد.</p>
+            <button type="button" className="ath-btn primary fit" onClick={chooseFromDrive} disabled={busy}>
+              <Glyph name="docOutline" size={18} /> اختيار ملف من Google Drive
+            </button>
           </div>
-        </Panel>
-      ) : null}
+        ) : null}
 
-      <label className="ath-drop">
-        <input
-          type="file"
-          multiple
-          accept="image/jpeg,image/png,image/webp,.pdf,.docx"
-          onChange={(event) => chooseFiles(event.target.files)}
-          disabled={busy}
-        />
-        <ElementArt art="planner" className="art" />
-        <strong>{files.length ? "تغيير الملفات المختارة" : "أضيفي ملفات الشاهد"}</strong>
-        <span className="fake"><Glyph name="upload" size={18} />اختيار الملفات</span>
-        <small>PDF أو صور أو Word · حتى {MAX_FILES} ملفات · 10 MB لكل ملف</small>
-      </label>
+        {source === "folder" ? (
+          <div className="add-option">
+            <p>اربطي مجلدًا مثل «دوراتي» مرة واحدة، ثم اضغطي «تحديث» لإضافة ملفاته الجديدة إلى الشاهد نفسه.</p>
+            {linkedFolders.length ? (
+              <div className="ath-stack">
+                {linkedFolders.map((folder) => (
+                  <div className="ath-file-row" key={folder.id}>
+                    <span className="ic"><Glyph name="folder" size={18} /></span>
+                    <div className="nm">
+                      <strong>{folder.name}</strong>
+                      <span>{folder.lastCheckedAt ? "حُدِّث سابقًا" : "لم يُحدَّث بعد"}</span>
+                    </div>
+                    <button type="button" className="ath-mini blue" onClick={() => refreshFolder(folder)} disabled={busy}>
+                      تحديث
+                    </button>
+                    <button
+                      type="button"
+                      className="ath-icon-btn"
+                      onClick={() => unlinkFolder(folder)}
+                      disabled={busy}
+                      aria-label={`إلغاء ربط ${folder.name}`}
+                    >
+                      <Glyph name="trash" size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="add-empty">لا توجد مجلدات مرتبطة.</p>
+            )}
+            <button type="button" className="ath-btn outline fit" onClick={linkNewFolder} disabled={busy}>
+              <Glyph name="plus" size={18} /> ربط مجلد
+            </button>
+          </div>
+        ) : null}
+      </section>
 
       {files.length ? (
         <Panel
           icon={<Glyph name="folder" size={22} />}
           title={files.length === 1 ? "ملف واحد" : files.length === 2 ? "ملفان" : `${files.length} ملفات`}
-          sub={`${formatSize(totalBytes)} إجمالًا · ${sourceLabel || "شاهد واحد"}`}
+          sub={sourceLabel || "شاهد واحد"}
         >
           {linkedSource?.kind === "folder" ? (
-            <Notice>
-              الملفات المختارة من هذا المجلد ستُدمج في شاهد واحد خاص بالمجلد، ويقترح أثري عنوانه وتصنيفه من المحتوى. عند تحديث المجلد تُضاف الملفات الجديدة إلى الشاهد نفسه.
-            </Notice>
+            <Notice>تُدمج ملفات المجلد في شاهد واحد، وتُضاف الملفات الجديدة إليه عند التحديث.</Notice>
           ) : isDriveLinked ? (
-            <Notice>الملفات مرتبطة من Google Drive وتبقى في موقعها الأصلي. لا ينقلها أثري عند الاعتماد.</Notice>
+            <Notice>الملفات مرتبطة من Google Drive وتبقى في مكانها الأصلي.</Notice>
           ) : null}
-          <div className="ath-stack" style={{ marginTop: isDriveLinked ? 10 : 0 }}>
-            {files.map((file, index) => (
-              <div className="ath-file-row" key={`${file.name}-${file.size}-${index}`}>
-                <span className="ic"><Glyph name="docOutline" size={18} /></span>
-                <div className="nm">
-                  <strong>{linkedDriveItems[index]?.name || file.name}</strong>
-                  <span>{formatSize(file.size)}{isDriveLinked ? " · مرتبط" : ""}</span>
+
+          <div className="add-capacity" aria-label="سعة الشاهد">
+            <span>{files.length} من {MAX_FILES} ملفات</span>
+            <span>{formatSize(totalBytes)} من {formatSize(MAX_TOTAL_BYTES)}</span>
+            <i><b style={{ width: `${Math.min(100, (totalBytes / MAX_TOTAL_BYTES) * 100)}%` }} /></i>
+          </div>
+
+          <div className="ath-stack">
+            {files.map((file, index) => {
+              const kind = fileKind(file);
+              return (
+                <div className="ath-file-row" key={`${file.name}-${file.size}-${index}`}>
+                  {previews[index] ? (
+                    <img className="add-thumb" src={previews[index]} alt="" />
+                  ) : (
+                    <span className={`add-kind ${kind.tone}`}>{kind.label}</span>
+                  )}
+                  <div className="nm">
+                    <strong>{linkedDriveItems[index]?.name || file.name}</strong>
+                    <span>{kind.label} · {formatSize(file.size)}{isDriveLinked ? " · مرتبط" : ""}</span>
+                  </div>
+                  <button type="button" className="ath-icon-btn" onClick={() => removeFile(index)} disabled={busy} aria-label={`إزالة ${file.name}`}>
+                    <Glyph name="trash" size={17} />
+                  </button>
                 </div>
-                <button type="button" className="ath-icon-btn" onClick={() => removeFile(index)} disabled={busy} aria-label={`إزالة ${file.name}`}>
-                  <Glyph name="trash" size={17} />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Panel>
       ) : null}
@@ -859,13 +948,18 @@ export default function NewEvidencePage() {
           <p>أبقي الصفحة مفتوحة حتى تكتمل العملية.</p>
         </section>
       ) : message ? (
-        <Notice tone={isError ? "error" : "info"}>{message}</Notice>
+        <div role={isError ? "alert" : "status"}>
+          <Notice tone={isError ? "error" : "info"}>{message}</Notice>
+        </div>
       ) : null}
 
-      <button type="button" className="ath-btn primary block" onClick={processEvidence} disabled={!files.length || busy}>
-        <Glyph name="sparkle" />
-        {busy ? "جاري الحفظ والتحليل…" : "حفظ وتحليل الشاهد"}
-      </button>
+      <div className="add-submit is-sticky">
+        <button type="button" className="ath-btn primary block" onClick={processEvidence} disabled={!files.length || busy}>
+          <Glyph name="sparkle" />
+          {busy ? "جاري الحفظ والتحليل…" : "حفظ وتحليل الشاهد"}
+        </button>
+        {!files.length && !busy ? <small>اختاري ملفًا واحدًا على الأقل للمتابعة.</small> : null}
+      </div>
     </AthShell>
   );
 }
