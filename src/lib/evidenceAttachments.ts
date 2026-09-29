@@ -121,7 +121,7 @@ export async function addSupportingImages(input: {
   if (tooLarge) throw new Error(`SUPPORTING_IMAGE_TOO_LARGE:${tooLarge.name}`);
 
   const parentFolderId = await destinationFolder(input.token, input.item);
-  let attachments = evidenceAttachmentsFor(input.item).map((attachment) => ({
+  let attachments: EvidenceAttachment[] = evidenceAttachmentsFor(input.item).map((attachment) => ({
     ...attachment,
     attachmentId: attachment.attachmentId || newAttachmentId(),
   }));
