@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AthShell, ElementArt, Glyph, Notice, Panel } from "@/components/athari-ui/Ui";
 import { InfoTip } from "@/components/InfoTip";
-import { suggestIndicators } from "@/lib/ai";
+import { analyzeEvidence, suggestIndicators } from "@/lib/ai";
 import { requireAuth } from "@/lib/firebase";
 import { ensureDriveAccessToken } from "@/lib/auth";
 import {
@@ -13,12 +13,22 @@ import {
   upsertAthariBackup,
 } from "@/lib/drive";
 import {
+  getActiveFrameworkElements,
   getEvidence,
   listUserEvidence,
 } from "@/lib/firestore";
 import { approveEvidenceLinkedSafe } from "@/lib/approveEvidence";
+import {
+  addSupportingImages,
+  evidenceAttachmentsFor,
+  isImageAttachment,
+  isSupportingImage,
+  loadSupportingImagesForAnalysis,
+  removeSupportingImage,
+} from "@/lib/evidenceAttachments";
 import { requirementsForElement } from "@/data/mandatory-requirements";
 import {
+  AiAnalysis,
   ApprovedContent,
   EvidenceAttachment,
   EvidenceRecord,
@@ -28,23 +38,42 @@ import {
 const MAX_CLASSIFICATIONS = 3;
 
 function attachmentsFor(item: EvidenceRecord): EvidenceAttachment[] {
-  if (item.attachments?.length) return item.attachments;
+  return evidenceAttachmentsFor(item);
+}
 
-  return [
-    {
-      originalFileName: item.originalFileName,
-      mimeType: item.mimeType,
-      fileSize: item.fileSize,
-      ...(item.contentHash ? { contentHash: item.contentHash } : {}),
-      ...(item.driveFileId ? { driveFileId: item.driveFileId } : {}),
-      ...(item.driveWebViewLink
-        ? { driveWebViewLink: item.driveWebViewLink }
-        : {}),
-      ...(item.driveParentFolderId
-        ? { driveParentFolderId: item.driveParentFolderId }
-        : {}),
-    },
-  ];
+function reanalysisContextFile(item: EvidenceRecord, input: {
+  title: string;
+  description: string;
+  impact: string;
+  highlight: string;
+}) {
+  const facts = (item.aiAnalysis?.extractedFacts ?? [])
+    .map((entry) => entry.fact)
+    .filter(Boolean);
+  const elementNames = item.approvedContent?.classifications?.length
+    ? item.approvedContent.classifications.map((entry) => entry.elementName)
+    : item.approvedContent?.elementName
+    ? [item.approvedContent.elementName]
+    : [];
+
+  const text = [
+    "سياق الشاهد الحالي قبل قراءة الصور الداعمة الجديدة:",
+    `العنوان الحالي: ${input.title.trim()}`,
+    `وصف التنفيذ الحالي: ${input.description.trim()}`,
+    `الأثر الحالي: ${input.impact.trim()}`,
+    input.highlight.trim() ? `مؤشرات التميز الحالية:
+${input.highlight.trim()}` : "",
+    elementNames.length ? `عناصر الأداء المعتمدة: ${elementNames.join("، ")}` : "",
+    facts.length ? `حقائق مستخرجة سابقًا:
+- ${facts.join("\n- ")}` : "",
+    "التعليمات: استخدم هذا النص كسياق للشاهد، واقرأ الصور الداعمة المرفقة معه. حدّث الصياغة فقط بما تضيفه الصور فعليًا، ولا تستنتج نتائج أو أرقامًا أو أثرًا غير ظاهر.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return new File([text], "athari-current-evidence-context.txt", {
+    type: "text/plain;charset=utf-8",
+  });
 }
 
 function ReviewInner() {
@@ -66,6 +95,14 @@ function ReviewInner() {
   const [highlight, setHighlight] = useState("");
   const [suggesting, setSuggesting] = useState(false);
   const [indicatorNote, setIndicatorNote] = useState("");
+  const [supportingBusy, setSupportingBusy] = useState(false);
+  const [supportingNote, setSupportingNote] = useState("");
+  const [supportingError, setSupportingError] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [reanalysisNote, setReanalysisNote] = useState("");
+  const [reanalysisError, setReanalysisError] = useState(false);
+  const [reanalysisProposal, setReanalysisProposal] = useState<AiAnalysis | null>(null);
+  const supportingInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!id) {
@@ -166,7 +203,7 @@ function ReviewInner() {
           : approvedNames,
       });
       if (result) {
-        setHighlight(result.slice(0, 400));
+        setHighlight(result.slice(0, 700));
         setIndicatorNote("أُضيف الاقتراح. راجعيه وعدّليه قبل الحفظ.");
       } else {
         setIndicatorNote("لم يجد أثري في بيانات هذا الشاهد ما يدعم مؤشر تميّز. يمكنك إضافة وصف أدق ثم المحاولة مرة أخرى.");
@@ -183,6 +220,206 @@ function ReviewInner() {
     } finally {
       setSuggesting(false);
     }
+  }
+
+  async function refreshBackupAfterAttachmentChange(uid: string, token: string) {
+    try {
+      const all = await listUserEvidence(uid);
+      await upsertAthariBackup(token, {
+        format: "athari-backup-v4",
+        exportedAt: new Date().toISOString(),
+        evidence: all.map((entry) => ({
+          id: entry.id,
+          academicYear: entry.academicYear,
+          status: entry.status,
+          originalFileName: entry.originalFileName,
+          fileCount: entry.fileCount,
+          attachments: entry.attachments,
+          driveFileId: entry.driveFileId,
+          driveWebViewLink: entry.driveWebViewLink,
+          driveSource: entry.driveSource,
+          approvedContent: entry.approvedContent,
+        })),
+      });
+    } catch {
+      // The evidence change is already saved. The regular portfolio flow can
+      // refresh the backup later without undoing the user's image update.
+    }
+  }
+
+  async function handleSupportingImages(files: FileList | null) {
+    if (!item || !files?.length || supportingBusy) return;
+    const selected = Array.from(files);
+    if (supportingInputRef.current) supportingInputRef.current.value = "";
+
+    setSupportingBusy(true);
+    setSupportingNote("");
+    setSupportingError(false);
+
+    try {
+      const user = requireAuth().currentUser;
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      if (item.ownerUid && item.ownerUid !== user.uid) throw new Error("NOT_OWNER");
+
+      const token = await ensureDriveAccessToken();
+      const result = await addSupportingImages({ token, item, files: selected });
+      const updated: EvidenceRecord = {
+        ...item,
+        attachments: result.attachments,
+        fileCount: result.attachments.length,
+      };
+      setItem(updated);
+      await refreshBackupAfterAttachmentChange(user.uid, token);
+
+      const addedCount = result.added.length;
+      const skippedCount = result.skipped.length;
+      if (addedCount && skippedCount) {
+        setSupportingNote(`تمت إضافة ${addedCount} صورة، وتجاوز ${skippedCount} صورة مكررة. يمكنك إعادة تحليل الصور لتحديث الوصف أو الأثر أو مؤشرات التميز.`);
+      } else if (addedCount) {
+        setSupportingNote(
+          item.status === "approved"
+            ? `تمت إضافة ${addedCount} ${addedCount === 1 ? "صورة" : "صور"} للشاهد. يمكنك إعادة تحليلها قبل تحديث المشاركة للمديرة.`
+            : `تمت إضافة ${addedCount} ${addedCount === 1 ? "صورة" : "صور"} للشاهد. التحليل اختياري ويمكن تشغيله من الزر أدناه.`
+        );
+      } else {
+        setSupportingNote("الصور المحددة موجودة مسبقًا في هذا الشاهد.");
+      }
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
+      setSupportingError(true);
+      setSupportingNote(
+        code === "DRIVE_RECONNECT_REQUIRED"
+          ? "يرجى تسجيل الدخول إلى Google ثم إعادة إضافة الصور."
+          : code.startsWith("SUPPORTING_IMAGE_TOO_LARGE:")
+          ? `إحدى الصور أكبر من 20 ميجابايت: ${code.split(":").slice(1).join(":")}`
+          : code === "SUPPORTING_IMAGES_ONLY"
+          ? "اختاري ملفات صور فقط."
+          : "تعذر حفظ الصور الآن. لم تتغير بيانات الشاهد الأصلية؛ أعيدي المحاولة."
+      );
+    } finally {
+      setSupportingBusy(false);
+    }
+  }
+
+  async function handleRemoveSupportingImage(attachment: EvidenceAttachment) {
+    if (!item || supportingBusy || !attachment.attachmentId || !isSupportingImage(attachment)) return;
+    if (!window.confirm(`إزالة «${attachment.originalFileName}» من الشاهد؟ سيبقى الملف محفوظًا في Google Drive.`)) return;
+
+    setSupportingBusy(true);
+    setSupportingNote("");
+    setSupportingError(false);
+    try {
+      const user = requireAuth().currentUser;
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      if (item.ownerUid && item.ownerUid !== user.uid) throw new Error("NOT_OWNER");
+
+      const current = attachmentsFor(item);
+      const next = await removeSupportingImage({
+        evidenceId: item.id,
+        attachments: current,
+        attachmentId: attachment.attachmentId,
+      });
+      const updated: EvidenceRecord = { ...item, attachments: next, fileCount: next.length };
+      setItem(updated);
+
+      try {
+        const token = await ensureDriveAccessToken();
+        await refreshBackupAfterAttachmentChange(user.uid, token);
+      } catch {
+        // Removing the attachment from the evidence does not require Drive deletion.
+      }
+
+      setSupportingNote(
+        item.status === "approved"
+          ? "أُزيلت الصورة من الشاهد. حدّثي المشاركة ليظهر التغيير للمديرة."
+          : "أُزيلت الصورة من الشاهد."
+      );
+    } catch {
+      setSupportingError(true);
+      setSupportingNote("تعذر إزالة الصورة الآن. حاولي مرة أخرى.");
+    } finally {
+      setSupportingBusy(false);
+    }
+  }
+
+  async function handleReanalyzeSupportingImages() {
+    if (!item || reanalyzing) return;
+    const supporting = attachmentsFor(item).filter(
+      (attachment) => isSupportingImage(attachment) && isImageAttachment(attachment)
+    );
+    if (!supporting.length) {
+      setReanalysisError(true);
+      setReanalysisNote("أضيفي صورًا داعمة أولًا، ثم أعيدي التحليل.");
+      return;
+    }
+
+    setReanalyzing(true);
+    setReanalysisNote("");
+    setReanalysisError(false);
+    setReanalysisProposal(null);
+
+    try {
+      const user = requireAuth().currentUser;
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      if (item.ownerUid && item.ownerUid !== user.uid) throw new Error("NOT_OWNER");
+
+      const token = await ensureDriveAccessToken();
+      const images = await loadSupportingImagesForAnalysis({
+        token,
+        attachments: supporting,
+      });
+      const context = reanalysisContextFile(item, {
+        title,
+        description,
+        impact,
+        highlight,
+      });
+      const framework = await getActiveFrameworkElements();
+      const proposal = await analyzeEvidence([context, ...images], framework);
+      setReanalysisProposal(proposal);
+      setReanalysisNote(
+        "اكتمل التحليل. راجعي المقترحات أدناه؛ لن يتغير أي حقل حتى تختاري استخدام المقترح."
+      );
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : "";
+      setReanalysisError(true);
+      setReanalysisNote(
+        code === "AI_FREE_LIMIT_REACHED"
+          ? "اكتملت حصة التحليل لهذا اليوم. الصور محفوظة ويمكن إعادة التحليل لاحقًا."
+          : code === "DRIVE_RECONNECT_REQUIRED"
+          ? "يرجى تسجيل الدخول إلى Google ثم إعادة التحليل."
+          : code === "TOO_MANY_SUPPORTING_IMAGES_FOR_ANALYSIS"
+          ? "يمكن إعادة تحليل حتى 7 صور داعمة في المرة الواحدة."
+          : code.startsWith("SUPPORTING_IMAGE_TOO_LARGE_FOR_ANALYSIS:")
+          ? `هذه الصورة أكبر من حد التحليل (10 MB): ${code.split(":").slice(1).join(":")}`
+          : "تعذر إعادة تحليل الصور الآن. لم تتغير الصياغة الحالية."
+      );
+    } finally {
+      setReanalyzing(false);
+    }
+  }
+
+  function useReanalysisField(field: "description" | "impact" | "highlight") {
+    if (!reanalysisProposal) return;
+    if (field === "description" && reanalysisProposal.draftDescription.trim()) {
+      setDescription(reanalysisProposal.draftDescription.trim());
+    }
+    if (field === "impact" && reanalysisProposal.draftImpact.trim()) {
+      setImpact(reanalysisProposal.draftImpact.trim());
+    }
+    if (field === "highlight") {
+      setHighlight((reanalysisProposal.draftHighlight ?? "").trim().slice(0, 700));
+    }
+    setReanalysisNote("تم نقل المقترح إلى الحقل. راجعيه ثم اعتمدي الشاهد لحفظ التحديث.");
   }
 
   const canApprove = useMemo(
@@ -359,6 +596,9 @@ function ReviewInner() {
 
   const analysis = item.aiAnalysis;
   const originals = attachmentsFor(item);
+  const supportingImages = originals.filter((attachment) =>
+    isSupportingImage(attachment) && isImageAttachment(attachment)
+  );
 
   return (
     <AthShell back={back} title="مراجعة الشاهد" subtitle="مراجعة البيانات والتصنيف وبنود المتابعة قبل الاعتماد.">
@@ -389,6 +629,122 @@ function ReviewInner() {
             </div>
           ))}
         </div>
+      </Panel>
+
+      <Panel
+        icon={<Glyph name="upload" size={22} />}
+        iconTone="blue"
+        title="صور داعمة للشاهد"
+        sub="صور التطبيق أو النتائج أو الأثر؛ تُضاف للشاهد الحالي دون إنشاء شاهد جديد أو إعادة التحليل."
+      >
+        <input
+          ref={supportingInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(event) => handleSupportingImages(event.target.files)}
+        />
+
+        {supportingImages.length ? (
+          <div className="rv-support-gallery" aria-label="الصور الداعمة المضافة">
+            {supportingImages.map((attachment) => (
+              <figure className="rv-support-image" key={attachment.attachmentId || attachment.originalFileName}>
+                {attachment.driveFileId ? (
+                  <a
+                    href={attachment.driveWebViewLink || `https://drive.google.com/file/d/${encodeURIComponent(attachment.driveFileId)}/view`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`فتح ${attachment.originalFileName}`}
+                  >
+                    <img
+                      src={`https://drive.google.com/thumbnail?id=${encodeURIComponent(attachment.driveFileId)}&sz=w640`}
+                      alt={attachment.originalFileName}
+                      loading="lazy"
+                    />
+                  </a>
+                ) : (
+                  <div className="rv-support-placeholder"><Glyph name="docOutline" size={26} /></div>
+                )}
+                <figcaption>
+                  <span title={attachment.originalFileName}>{attachment.originalFileName}</span>
+                  <button
+                    type="button"
+                    className="rv-support-remove"
+                    disabled={supportingBusy}
+                    onClick={() => handleRemoveSupportingImage(attachment)}
+                    aria-label={`إزالة ${attachment.originalFileName} من الشاهد`}
+                  >
+                    <Glyph name="trash" size={15} />إزالة
+                  </button>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : (
+          <div className="rv-support-empty">
+            <Glyph name="docOutline" size={24} />
+            <span>لا توجد صور داعمة مضافة لهذا الشاهد بعد.</span>
+          </div>
+        )}
+
+        <div className="rv-support-actions">
+          <button
+            type="button"
+            className="ath-btn outline fit"
+            disabled={supportingBusy}
+            onClick={() => supportingInputRef.current?.click()}
+          >
+            <Glyph name="plus" size={16} />
+            {supportingBusy ? "جاري الحفظ…" : "إضافة صور للشاهد"}
+          </button>
+          <small>إضافة الصور لا تغيّر الصياغة تلقائيًا. بعد الإضافة يمكنك إعادة تحليلها واختيار ما تريدين تحديثه.</small>
+        </div>
+        {supportingNote ? <Notice tone={supportingError ? "error" : "info"}>{supportingNote}</Notice> : null}
+
+        {supportingImages.length ? (
+          <div className="rv-reanalysis">
+            <button
+              type="button"
+              className="ath-btn outline fit"
+              disabled={reanalyzing || supportingBusy}
+              onClick={handleReanalyzeSupportingImages}
+            >
+              <Glyph name="sparkle" size={16} />
+              {reanalyzing ? "جاري تحليل الصور…" : "إعادة تحليل الصور المضافة"}
+            </button>
+            <small>يقرأ أثري الصور مع الصياغة الحالية ويقترح تحديثًا للوصف والأثر ومؤشرات التميّز فقط. لا يستبدل أي نص تلقائيًا.</small>
+          </div>
+        ) : null}
+
+        {reanalysisNote ? <Notice tone={reanalysisError ? "error" : "info"}>{reanalysisNote}</Notice> : null}
+
+        {reanalysisProposal ? (
+          <div className="rv-reanalysis-proposal">
+            <div className="rv-reanalysis-head">
+              <strong>مقترحات مستخرجة من الصور الداعمة</strong>
+              <span>اختاري ما تريدين إضافته إلى الشاهد.</span>
+            </div>
+            {reanalysisProposal.draftDescription.trim() ? (
+              <div className="rv-reanalysis-item">
+                <div><b>وصف التنفيذ المقترح</b><p>{reanalysisProposal.draftDescription}</p></div>
+                <button type="button" onClick={() => useReanalysisField("description")}>استخدام الوصف</button>
+              </div>
+            ) : null}
+            {reanalysisProposal.draftImpact.trim() ? (
+              <div className="rv-reanalysis-item">
+                <div><b>الأثر المدعوم المقترح</b><p>{reanalysisProposal.draftImpact}</p></div>
+                <button type="button" onClick={() => useReanalysisField("impact")}>استخدام الأثر</button>
+              </div>
+            ) : null}
+            {(reanalysisProposal.draftHighlight ?? "").trim() ? (
+              <div className="rv-reanalysis-item">
+                <div><b>مؤشرات التميّز المقترحة</b><p className="rv-preline">{reanalysisProposal.draftHighlight}</p></div>
+                <button type="button" onClick={() => useReanalysisField("highlight")}>استخدام المؤشرات</button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </Panel>
 
       {item.driveSource?.kind === "folder" ? (
@@ -482,9 +838,9 @@ function ReviewInner() {
         <div className="ath-field">
           <label htmlFor="ev-highlight" className="v7-inline">
             مؤشرات التميّز (اختياري)
-            <InfoTip text="اكتبي فقط ما يثبت تميزا يتجاوز المتطلب الأساسي، مثل ابتكار موثق، أو اتساع الأثر، أو نتيجة قابلة للقياس، أو استدامة ونقل للتجربة. كل مؤشر في سطر، ويجب أن يكون مدعوما بالشاهد نفسه." />
+            <InfoTip text="اكتبي فقط ما يثبت تميزا يتجاوز المتطلب الأساسي. يستهدف أثري حتى 5 مؤشرات عندما يدعمها الشاهد، ولا يضيف مؤشرات غير موثقة." />
           </label>
-          <textarea id="ev-highlight" rows={4} maxLength={400} value={highlight} onChange={(event) => setHighlight(event.target.value)} placeholder={"مثال:\nأول تطبيق لهذه الاستراتيجية في مقررات الصف الأول الثانوي بالمدرسة.\nنُقلت التجربة لزميلات القسم عبر ورشة تطبيقية."} />
+          <textarea id="ev-highlight" rows={6} maxLength={700} value={highlight} onChange={(event) => setHighlight(event.target.value)} placeholder={"مثال:\nأول تطبيق لهذه الاستراتيجية في مقررات الصف الأول الثانوي بالمدرسة.\nنُقلت التجربة لزميلات القسم عبر ورشة تطبيقية."} />
           <div className="rv-suggest">
             <button type="button" onClick={handleSuggestIndicators} disabled={suggesting} aria-busy={suggesting}>
               <Glyph name="star" size={15} />

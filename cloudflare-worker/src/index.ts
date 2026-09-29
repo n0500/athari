@@ -242,12 +242,12 @@ function cleanIndicatorLines(value: unknown) {
     .split(/\n+/)
     .map((line) => line.replace(/^\s*(?:[•\-–*·◆]\s*|[0-9٠-٩]+[.)]\s*)/, "").trim())
     .filter((line) => line.length > 0 && line.length <= 200)
-    .slice(0, 3);
+    .slice(0, 5);
 
   const kept: string[] = [];
   for (const line of lines) {
     const next = [...kept, line].join("\n");
-    if (next.length > 400) break;
+    if (next.length > 700) break;
     kept.push(line);
   }
   return kept.join("\n");
@@ -284,7 +284,7 @@ async function handleIndicators(request: Request, env: Env, origin: string) {
 You write "excellence indicators" (مؤشرات التميّز) for ONE teacher evidence item, using ONLY the text below.
 
 RULES:
-- Up to 3 lines, one indicator per line, each at most 20 words, formal Modern Standard Arabic.
+- Up to 5 lines, one indicator per line, each at most 20 words, formal Modern Standard Arabic.
 - Each line shows why the work goes beyond the basic requirement, chosen only from what the text documents: innovation (a first or new practice), reach (beyond her own class: department, school, parents, community), documented measurable result, or sustainability/transfer (repeated practice, shared with colleagues).
 - Never invent firsts, numbers, dates, results, participants or places. No generic praise. Do not restate the title.
 - If the text does not support any indicator, return an empty string.
@@ -300,7 +300,7 @@ ${source}
         { role: "user", content: prompt },
       ],
       temperature: 0.1,
-      max_completion_tokens: 400,
+      max_completion_tokens: 600,
       chat_template_kwargs: { enable_thinking: false },
     });
 
@@ -464,7 +464,7 @@ NON-NEGOTIABLE RULES:
 - requirementIds are suggestions for teacher confirmation, not an automatic score or final decision.
 - draftImpact must contain only impact directly supported by evidence.
 - If no impact is documented, write exactly: "لا يوجد أثر موثق متاح حاليًا."
-- draftHighlight lists up to 3 "excellence indicators" (مؤشرات التميّز), one per line separated by "\n", each at most 20 words, formal Arabic. Each line shows why the work goes beyond the basic requirement, choosing only from what the evidence documents: innovation (a first or new practice), reach (beyond her own class: department, school, parents, community), documented measurable result, or sustainability/transfer (repeated practice, shared with colleagues). Never invent firsts, numbers, dates, results or participants; no generic praise. Return fewer lines, or an empty string, when the evidence does not support them.
+- draftHighlight lists up to 5 "excellence indicators" (مؤشرات التميّز), one per line separated by "\n", each at most 20 words, formal Arabic. Each line shows why the work goes beyond the basic requirement, choosing only from what the evidence documents: innovation (a first or new practice), reach (beyond her own class: department, school, parents, community), documented measurable result, or sustainability/transfer (repeated practice, shared with colleagues). Never invent firsts, numbers, dates, results or participants; no generic praise. Return fewer lines, or an empty string, when the evidence does not support them.
 - Ask at most ONE essential missing-information question.
 - Never score or rate the teacher.
 - Return JSON only, with no Markdown fence and no commentary.

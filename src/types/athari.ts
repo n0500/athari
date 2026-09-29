@@ -64,6 +64,8 @@ export type EvidenceAttachment = {
   driveParentFolderId?: string;
   /** athari_upload = copied into Athari folders; drive_link = stays in the teacher's selected Drive location. */
   sourceKind?: "athari_upload" | "drive_link";
+  /** Optional semantic role. Existing attachments without this field remain original evidence. */
+  purpose?: "supporting_image";
 };
 
 export type DriveSourceLink = {
