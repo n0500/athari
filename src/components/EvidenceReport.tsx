@@ -27,6 +27,8 @@ export type ReportMeta = {
   department?: string;
   principalName?: string;
   academicYear?: string;
+  specialization?: string;
+  rank?: string;
 };
 
 const NO_IMPACT = "لا يوجد أثر موثق متاح حاليًا.";
@@ -38,6 +40,29 @@ function attachmentKind(mimeType: string, name: string) {
   if (mimeType.startsWith("video/")) return { label: "فيديو", tone: "doc" };
   if (lower.endsWith(".docx") || mimeType.includes("word")) return { label: "Word", tone: "doc" };
   return { label: "ملف", tone: "other" };
+}
+
+/**
+ * A readable attachment name: no extension, no repeated owner name.
+ * "نهى … المطيري - دورة كذا.pdf" → "دورة كذا"; a name that is only the owner's → "مرفق 3".
+ */
+function attachmentTitle(name: string, ownerName: string, index: number) {
+  const ownerWords = new Set(ownerName.split(/\s+/).filter((word) => word.length > 1));
+  const isOwnerOnly = (part: string) => {
+    const words = part.replace(/[\d().\-_]+/g, " ").split(/\s+/).filter(Boolean);
+    const shared = words.filter((word) => ownerWords.has(word)).length;
+    return !words.length || (shared >= 2 && shared >= words.length - 1);
+  };
+  const base = name.replace(/\.[a-z0-9]{2,5}$/i, "").trim();
+  const kept = base.split(" - ").map((part) => part.trim()).filter((part) => part && !isOwnerOnly(part));
+  return kept.length ? kept.join(" - ") : `مرفق ${index + 1}`;
+}
+
+function attachmentCount(count: number) {
+  if (count === 1) return "ملف واحد";
+  if (count === 2) return "ملفان";
+  if (count <= 10) return `${count} ملفات`;
+  return `${count} ملفًا`;
 }
 
 function thumbnailUrl(fileId: string) {
@@ -104,6 +129,9 @@ export function EvidenceReport({
       .map((requirement) => ({ ...requirement, elementName: classification.elementName }));
   });
   const impact = item.impact && item.impact !== NO_IMPACT ? item.impact : "";
+  const primary = ordered[0];
+  const secondary = ordered.slice(1);
+  const roleLine = [meta.specialization, meta.rank].filter(Boolean).join(" · ");
   const images = item.attachments
     .map((attachment, index) => ({ attachment, index }))
     .filter(({ attachment }) => attachment.driveFileId && attachmentKind(attachment.mimeType, attachment.originalFileName).tone === "img")
@@ -156,52 +184,61 @@ export function EvidenceReport({
           ) : <span className="ev-report-spacer" />}
         </header>
 
-        {/* Official letterhead: shown on screen and in print */}
-        <div className="ev-letterhead">
-          <div className="ev-letterhead-org">
-            <strong>وزارة التعليم</strong>
-            {meta.department ? <span>{meta.department}</span> : null}
-            {meta.school ? <span>{meta.school}</span> : null}
+        <div className="rp-paper">
+          {/* Official letterhead: shown on screen and in print */}
+          <div className="rp-lh">
+            <div className="rp-lh-org">
+              <strong>المملكة العربية السعودية</strong>
+              <span>{meta.ministry || "وزارة التعليم"}</span>
+              {meta.department ? <span>{meta.department}</span> : null}
+              {meta.school ? <span>{meta.school}</span> : null}
+            </div>
+            <div className="rp-lh-doc">
+              <strong>تقرير شاهد</strong>
+              {meta.academicYear ? <span>العام الدراسي {meta.academicYear}</span> : null}
+              <span>التاريخ: {printedOn}</span>
+            </div>
           </div>
-          <div className="ev-letterhead-doc">
-            <strong>تقرير شاهد</strong>
-            <span>ملف الأداء المهني</span>
-            {meta.academicYear ? <span>العام الدراسي {meta.academicYear}</span> : null}
-          </div>
-        </div>
+          <div className="rp-rule" aria-hidden />
 
-        <div className="ev-report-body">
-          <div className="ev-report-tags">
-            {ordered.map((classification) => (
-              <span key={classification.elementId} className={classification.isPrimary ? "primary" : ""}>
-                {classification.isPrimary ? "العنصر الأساسي: " : ""}{classification.elementName}
-              </span>
-            ))}
+          <div className="rp-title">
+            {primary ? <small>{primary.elementName}</small> : null}
+            <h2 id="ev-report-title">{item.title}</h2>
           </div>
 
-          <h2 id="ev-report-title">{item.title}</h2>
+          <table className="rp-info">
+            <tbody>
+              <tr><th scope="row">اسم المعلمة</th><td>{meta.ownerName || "—"}</td></tr>
+              {roleLine ? <tr><th scope="row">التخصص / الرتبة</th><td>{roleLine}</td></tr> : null}
+              <tr><th scope="row">عنصر التقييم</th><td>{primary?.elementName || "—"}</td></tr>
+              {secondary.length ? (
+                <tr><th scope="row">عناصر داعمة</th><td>{secondary.map((entry) => entry.elementName).join("، ")}</td></tr>
+              ) : null}
+              <tr><th scope="row">عدد المرفقات</th><td>{attachmentCount(item.attachments.length)}</td></tr>
+            </tbody>
+          </table>
 
           {item.description ? (
-            <section className="ev-report-sec">
+            <section className="rp-sec">
               <h3>وصف التنفيذ</h3>
               <p>{item.description}</p>
             </section>
           ) : null}
 
           {impact ? (
-            <section className="ev-report-sec">
+            <section className="rp-sec">
               <h3>الأثر</h3>
-              <p>{impact}</p>
+              <div className="rp-box"><p>{impact}</p></div>
             </section>
           ) : null}
 
           {documented.length ? (
-            <section className="ev-report-sec">
+            <section className="rp-sec">
               <h3>بنود المتابعة الموثقة</h3>
-              <ul className="ev-report-reqs">
+              <ul className="rp-reqs">
                 {documented.map((requirement) => (
                   <li key={`${requirement.elementName}-${requirement.id}`}>
-                    <Glyph name="check" size={16} />
+                    <i aria-hidden>✓</i>
                     <span>{requirement.label}</span>
                   </li>
                 ))}
@@ -210,7 +247,7 @@ export function EvidenceReport({
           ) : null}
 
           {images.length ? (
-            <section className="ev-report-sec ev-report-gallery">
+            <section className="rp-sec rp-gallery">
               <h3>صور من الشاهد</h3>
               <div>
                 {images.map(({ attachment, index }) => (
@@ -221,7 +258,7 @@ export function EvidenceReport({
                   >
                     <img
                       src={thumbnailUrl(attachment.driveFileId!)}
-                      alt={attachment.originalFileName}
+                      alt={attachmentTitle(attachment.originalFileName, meta.ownerName, index)}
                       loading="eager"
                       referrerPolicy="no-referrer"
                       onError={(event) => {
@@ -236,43 +273,46 @@ export function EvidenceReport({
           ) : null}
 
           {item.attachments.length ? (
-            <section className="ev-report-sec">
-              <h3>المرفقات ({item.attachments.length})</h3>
-              <div className="ev-report-files">
+            <section className="rp-sec">
+              <h3>المرفقات</h3>
+              <ol className="rp-files">
                 {item.attachments.map((attachment, index) => {
                   const kind = attachmentKind(attachment.mimeType, attachment.originalFileName);
+                  const canOpen = Boolean(attachment.driveFileId && onOpenAttachment);
                   return (
-                    <div className="ev-report-file" key={`${attachment.originalFileName}-${index}`}>
-                      <span className={`add-kind ${kind.tone}`}>{kind.label}</span>
-                      <strong>{attachment.originalFileName}</strong>
-                      {attachment.driveFileId && onOpenAttachment ? (
-                        <button type="button" onClick={() => onOpenAttachment(index)}>
-                          <Glyph name="eye" size={16} />عرض
+                    <li key={`${attachment.originalFileName}-${index}`}>
+                      <span className="rp-num" aria-hidden>{index + 1}</span>
+                      <span className="rp-name" title={attachment.originalFileName}>
+                        {attachmentTitle(attachment.originalFileName, meta.ownerName, index)}
+                      </span>
+                      <span className={`rp-kind ${kind.tone}`}>{kind.label}</span>
+                      {canOpen ? (
+                        <button type="button" className="rp-open" onClick={() => onOpenAttachment!(index)} aria-label={`عرض المرفق ${index + 1}`}>
+                          <Glyph name="eye" size={16} />
                         </button>
                       ) : null}
-                    </div>
+                    </li>
                   );
                 })}
-              </div>
+              </ol>
             </section>
           ) : null}
-        </div>
 
-        <footer className="ev-signatures">
-          <div>
-            <span>المعلمة</span>
-            <strong>{meta.ownerName || "—"}</strong>
-            <i aria-hidden />
-            <small>التوقيع</small>
-          </div>
-          <div>
-            <span>مديرة المدرسة</span>
-            <strong>{meta.principalName || "—"}</strong>
-            <i aria-hidden />
-            <small>التوقيع</small>
-          </div>
-        </footer>
-        <p className="ev-issued">أُعدّ عبر أثري بتاريخ {printedOn}</p>
+          <table className="rp-sign">
+            <thead>
+              <tr><th scope="col">المعلمة</th><th scope="col">مديرة المدرسة</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>{meta.ownerName || "—"}</strong></td><td><strong>{meta.principalName || "—"}</strong></td></tr>
+              <tr><td className="rp-sign-space">التوقيع</td><td className="rp-sign-space">التوقيع والختم</td></tr>
+            </tbody>
+          </table>
+
+          <footer className="rp-foot">
+            <span>أُعدّ عبر أثري</span>
+            <span>{printedOn}</span>
+          </footer>
+        </div>
       </article>
     </div>,
     document.body

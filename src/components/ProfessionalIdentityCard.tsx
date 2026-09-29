@@ -37,7 +37,7 @@ export function ProfessionalIdentityCard({
   if (!profile && !fallbackName) return null;
   const p = profile;
   const name = p?.fullName || fallbackName;
-  const headline = [p?.professionalRank, p?.specialization].filter(Boolean).join(" · ");
+  const chips = [p?.professionalRank, p?.specialization, p?.experience].filter(Boolean) as string[];
 
   const groups = [
     {
@@ -95,10 +95,10 @@ export function ProfessionalIdentityCard({
   );
 
   const data = groups.length ? (
-    <div className="pid-groups">
+    <div className="idc-groups">
       {groups.map((group) => (
-        <div className="pid-group" key={group.title}>
-          <h3><Glyph name={group.icon} size={16} />{group.title}</h3>
+        <div className="idc-group" key={group.title}>
+          <h3>{group.title}</h3>
           <dl>
             {group.items.map((item) => (
               <div key={item.label}>
@@ -142,7 +142,7 @@ export function ProfessionalIdentityCard({
   ) : null;
 
   const tabs = [
-    { key: "about" as const, label: p?.vision || p?.mission ? "الرؤية والرسالة" : "النبذة", has: Boolean(p?.bio || p?.vision || p?.mission), body: about },
+    { key: "about" as const, label: "النبذة", has: Boolean(p?.bio || p?.vision || p?.mission), body: about },
     { key: "data" as const, label: "البيانات", has: Boolean(data), body: data },
     { key: "achievements" as const, label: "المنجزات", has: Boolean(achievements.length || goals.length), body: achievementsBlock },
     { key: "documents" as const, label: "الوثائق", has: Boolean(documents.length), body: documentsBlock },
@@ -163,22 +163,26 @@ export function ProfessionalIdentityCard({
   }
 
   return (
-    <section className="ath-panel pid">
-      <header className="pid-head">
-        <span className="pid-avatar" aria-hidden>{(name || "أ").replace(/^أ\.\s*/, "").charAt(0)}</span>
-        <div>
-          <span className="pid-kicker">الهوية المهنية</span>
-          {showName && name ? <h2>{name}</h2> : null}
-          {headline ? <p className="pid-headline">{headline}</p> : !showName ? <p className="pid-headline">{name}</p> : null}
+    <section className="idc pid" aria-label="الهوية المهنية">
+      <header className="idc-head">
+        <span className="idc-avatar" aria-hidden>{(name || "أ").replace(/^أ\.\s*/, "").charAt(0)}</span>
+        <div className="idc-id">
+          <span className="idc-kicker">الهوية المهنية</span>
+          {name ? <h2>{name}</h2> : null}
+          {chips.length ? (
+            <div className="idc-chips">
+              {chips.map((chip) => <span key={chip}>{chip}</span>)}
+            </div>
+          ) : null}
         </div>
       </header>
 
       {tabs.length > 1 ? (
         <div
-          className="pid-tabs no-print"
+          className="idc-tabs no-print"
           role="tablist"
           aria-label="أقسام الهوية المهنية"
-          style={{ gridTemplateColumns: tabs.map((tab) => (tab.key === "about" ? "1.5fr" : "1fr")).join(" ") }}
+          style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}
           onKeyDown={onKey}
         >
           {tabs.map((tab) => {
@@ -208,7 +212,7 @@ export function ProfessionalIdentityCard({
           id={`${baseId}-panel-${tab.key}`}
           role={tabs.length > 1 ? "tabpanel" : undefined}
           aria-labelledby={tabs.length > 1 ? `${baseId}-tab-${tab.key}` : undefined}
-          className={`pid-panel ${tab.key === current?.key ? "is-on" : ""}`}
+          className={`pid-panel idc-panel ${tab.key === current?.key ? "is-on" : ""}`}
           data-title={tab.label}
         >
           {tab.body}

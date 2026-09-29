@@ -353,6 +353,8 @@ export default function PublicSharePage() {
             school: share.professionalProfile?.school || "",
             department: share.professionalProfile?.educationDepartment || "",
             principalName: share.professionalProfile?.principalName || "",
+            specialization: share.professionalProfile?.specialization || "",
+            rank: share.professionalProfile?.professionalRank || "",
             academicYear: share.academicYear,
           }}
           onClose={() => setReport(null)}

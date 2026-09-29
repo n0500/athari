@@ -71,7 +71,7 @@ function ElementPageInner() {
   const element = OFFICIAL_TEACHER_FRAMEWORK_V2.find((entry) => entry.id === elementId);
   const guidance = element ? ELEMENT_GUIDANCE[element.id] : undefined;
   const [report, setReport] = useState<{ data: ReportEvidence; links: string[] } | null>(null);
-  const [owner, setOwner] = useState({ name: "", ministry: "", school: "", department: "", principal: "" });
+  const [owner, setOwner] = useState({ name: "", ministry: "", school: "", department: "", principal: "", specialization: "", rank: "" });
   const [items, setItems] = useState<EvidenceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -92,9 +92,11 @@ function ElementPageInner() {
             school: profile.school,
             department: profile.educationDepartment,
             principal: profile.principalName ?? "",
+            specialization: profile.specialization,
+            rank: profile.professionalRank,
           })
         )
-        .catch(() => setOwner({ name: user.displayName?.trim() || "", ministry: "", school: "", department: "", principal: "" }));
+        .catch(() => setOwner({ name: user.displayName?.trim() || "", ministry: "", school: "", department: "", principal: "", specialization: "", rank: "" }));
 
       try {
         setError("");
@@ -263,6 +265,8 @@ function ElementPageInner() {
             school: owner.school,
             department: owner.department,
             principalName: owner.principal,
+            specialization: owner.specialization,
+            rank: owner.rank,
             academicYear: items.find((entry) => entry.id === report.data.id)?.academicYear,
           }}
           onClose={() => setReport(null)}
