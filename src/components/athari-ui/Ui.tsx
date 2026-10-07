@@ -138,6 +138,7 @@ export function AthShell({
   back,
   accountHref = "/account",
   publicPage = false,
+  wide = false,
 }: {
   children: ReactNode;
   title?: string;
@@ -148,6 +149,8 @@ export function AthShell({
   accountHref?: string | null;
   /** The principal's shared view is public; every other page needs a signed-in teacher. */
   publicPage?: boolean;
+  /** Uses the width of a laptop or desktop screen instead of a phone-width column. */
+  wide?: boolean;
 }) {
   const content = (
     <>
@@ -162,7 +165,7 @@ export function AthShell({
   );
   return (
     <div className="ath">
-      <div className={`ath-frame ${showNav ? "has-nav" : ""}`}>
+      <div className={`ath-frame ${showNav ? "has-nav" : ""} ${wide ? "is-wide" : ""}`}>
         <header className="ath-top no-print">
           {back ? (
             <Tappable {...back} className="ath-back" label="رجوع"><Glyph name="chevRight" size={18} /></Tappable>

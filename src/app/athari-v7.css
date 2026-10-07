@@ -459,3 +459,18 @@ button.el-excel-proof:hover { background: #fbe6b0; }
   color: #5b6b80;
   font-size: 15px;
 }
+
+/* Wide screens (laptop, desktop, iPad landscape): the principal's view uses the
+   available width instead of a phone-width column. Phones are unchanged. */
+@media (min-width: 900px) {
+  .ath-frame.is-wide { max-width: 1080px; padding-inline: 24px; }
+  .ath-frame.is-wide .ath-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .ath-frame.is-wide .sec-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+  .ath-frame.is-wide .ath-hero { padding: 26px 28px; }
+  .ath-frame.is-wide .ath-hero h1 { font-size: 30px; }
+  .ath-frame.is-wide .ath-hero-btns { max-width: 420px; }
+}
+@media (min-width: 1280px) {
+  .ath-frame.is-wide { max-width: 1200px; }
+  .ath-frame.is-wide .ath-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
