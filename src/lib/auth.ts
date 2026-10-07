@@ -1,8 +1,6 @@
 import {
-  browserLocalPersistence,
   GoogleAuthProvider,
   reauthenticateWithPopup,
-  setPersistence,
   signInWithPopup,
   signOut,
   User,
@@ -96,10 +94,10 @@ export function getStoredDriveToken() {
 }
 
 export async function signInWithGoogleAndDrive(): Promise<User> {
-  const auth = requireAuth();
-  await setPersistence(auth, browserLocalPersistence);
-
-  const result = await signInWithPopup(auth, provider());
+  // The popup must open directly from the tap: any await before it makes
+  // Safari treat it as an unrequested pop-up and show a blocking prompt.
+  // Local persistence is already the web default, so no setup call is needed.
+  const result = await signInWithPopup(requireAuth(), provider());
   const credential = GoogleAuthProvider.credentialFromResult(result);
   saveDriveToken(credential?.accessToken, result.user.uid);
   return result.user;

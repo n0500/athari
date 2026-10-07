@@ -225,6 +225,8 @@ export default function PortfolioPage() {
     try {
       setShareBusy(true);
       setShareMessage("");
+      // Ask Google first, while still inside the tap, so the browser shows no pop-up warning.
+      const token = await ensureDriveAccessToken();
 
       // Re-read professional documents at the moment of sharing. Never rely on a
       // possibly failed/stale page-load snapshot, because that could accidentally
@@ -248,7 +250,6 @@ export default function PortfolioPage() {
         ),
       ];
 
-      const token = await ensureDriveAccessToken();
       const currentShare = await getActivePortfolioShare(user.uid).catch(() => null);
       const previousPermissions = currentShare?.drivePermissions ?? sharePermissions;
 
