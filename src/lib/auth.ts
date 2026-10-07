@@ -103,6 +103,16 @@ export async function signInWithGoogleAndDrive(): Promise<User> {
   return result.user;
 }
 
+/** Shown with a «متابعة» button when a file was chosen but Google must be asked first. */
+export const DRIVE_CONTINUE_MESSAGE =
+  "لإكمال الحفظ في Google Drive، اضغطي «متابعة» لتأكيد حسابك في Google.";
+
+/**
+ * Opens a Google window when the stored Drive access has expired. Browsers
+ * (Safari above all) only allow that window when it opens directly from a tap,
+ * so call it as the first await of a button handler. After a file picker,
+ * timers or other awaits, use getStoredDriveToken() and ask for a tap instead.
+ */
 export async function ensureDriveAccessToken(): Promise<string> {
   const existing = getStoredDriveToken();
   if (existing) return existing;

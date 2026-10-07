@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Glyph, Notice, Panel } from "@/components/athari-ui/Ui";
 import { InfoTip } from "@/components/InfoTip";
-import { ensureDriveAccessToken } from "@/lib/auth";
+import { DRIVE_CONTINUE_MESSAGE, ensureDriveAccessToken, getStoredDriveToken } from "@/lib/auth";
 import {
   DOCUMENT_SLOTS,
   MAX_DOCUMENT_BYTES,
@@ -34,6 +34,8 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
   const [otherLabel, setOtherLabel] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const targetRef = useRef<Target | null>(null);
+  // A chosen file waiting for one tap on «متابعة» when Drive access has expired.
+  const [pending, setPending] = useState<{ file: File; target: Target } | null>(null);
   // Professional-document writes replace the whole saved list. Serialize mutations so
   // a second quick action cannot save an older snapshot over the first one.
   const mutationLockRef = useRef(false);
@@ -73,6 +75,31 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
       return;
     }
 
+    // Choosing a file is not a tap the browser accepts for opening a Google window.
+    if (!getStoredDriveToken()) {
+      setPending({ file, target });
+      setIsError(false);
+      setMessage(DRIVE_CONTINUE_MESSAGE);
+      return;
+    }
+    await upload(file, target);
+  }
+
+  async function continuePending() {
+    if (!pending) return;
+    try {
+      await ensureDriveAccessToken(); // first await: opens directly from the tap
+    } catch {
+      setIsError(true);
+      setMessage("لم يكتمل تأكيد حساب Google. اضغطي «متابعة» مرة أخرى.");
+      return;
+    }
+    const { file, target } = pending;
+    setPending(null);
+    await upload(file, target);
+  }
+
+  async function upload(file: File, target: Target) {
     const key = target.replaceId ?? target.kind;
     if (mutationLockRef.current) return;
     mutationLockRef.current = true;
@@ -220,6 +247,16 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
       )}
 
       {message ? <Notice tone={isError ? "error" : "info"}>{message}</Notice> : null}
+      {pending ? (
+        <div className="ath-actions">
+          <button type="button" className="ath-btn primary fit" onClick={continuePending} disabled={Boolean(busyKey)}>
+            <Glyph name="upload" size={16} />متابعة رفع «{pending.target.label}»
+          </button>
+          <button type="button" className="ath-btn outline fit" onClick={() => { setPending(null); setMessage(""); }}>
+            إلغاء
+          </button>
+        </div>
+      ) : null}
       <p className="ath-fine">تُحفظ الملفات في مجلد «أثري / الوثائق المهنية» في Google Drive الخاص بك.</p>
     </Panel>
   );

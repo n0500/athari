@@ -6,7 +6,7 @@ import { AthShell, ElementArt, Glyph, Notice, Panel } from "@/components/athari-
 import { InfoTip } from "@/components/InfoTip";
 import { analyzeEvidence, suggestIndicators } from "@/lib/ai";
 import { requireAuth } from "@/lib/firebase";
-import { ensureDriveAccessToken } from "@/lib/auth";
+import { DRIVE_CONTINUE_MESSAGE, ensureDriveAccessToken, getStoredDriveToken } from "@/lib/auth";
 import {
   ensureAthariElementFolder,
   moveDriveFile,
@@ -97,6 +97,7 @@ function ReviewInner() {
   const [indicatorNote, setIndicatorNote] = useState("");
   const [supportingBusy, setSupportingBusy] = useState(false);
   const [supportingNote, setSupportingNote] = useState("");
+  const [pendingSupporting, setPendingSupporting] = useState<File[] | null>(null);
   const [supportingError, setSupportingError] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalysisNote, setReanalysisNote] = useState("");
@@ -252,6 +253,33 @@ function ReviewInner() {
     const selected = Array.from(files);
     if (supportingInputRef.current) supportingInputRef.current.value = "";
 
+    // Choosing files is not a tap the browser accepts for opening a Google window.
+    // Keep the files and ask for one tap on «متابعة» when Drive access has expired.
+    if (!getStoredDriveToken()) {
+      setPendingSupporting(selected);
+      setSupportingError(false);
+      setSupportingNote(DRIVE_CONTINUE_MESSAGE);
+      return;
+    }
+    await saveSupportingImages(selected);
+  }
+
+  async function continueSupportingImages() {
+    const selected = pendingSupporting;
+    if (!selected?.length) return;
+    try {
+      await ensureDriveAccessToken(); // first await: opens directly from the tap
+    } catch {
+      setSupportingError(true);
+      setSupportingNote("لم يكتمل تأكيد حساب Google. اضغطي «متابعة» مرة أخرى.");
+      return;
+    }
+    setPendingSupporting(null);
+    await saveSupportingImages(selected);
+  }
+
+  async function saveSupportingImages(selected: File[]) {
+    if (!item) return;
     setSupportingBusy(true);
     setSupportingNote("");
     setSupportingError(false);
@@ -329,8 +357,9 @@ function ReviewInner() {
       setItem(updated);
 
       try {
-        const token = await ensureDriveAccessToken();
-        await refreshBackupAfterAttachmentChange(user.uid, token);
+        // After other awaits a Google window would be blocked; refresh the backup only with a current token.
+        const token = getStoredDriveToken();
+        if (token) await refreshBackupAfterAttachmentChange(user.uid, token);
       } catch {
         // Removing the attachment from the evidence does not require Drive deletion.
       }
@@ -701,6 +730,16 @@ function ReviewInner() {
           <small>إضافة الصور لا تغيّر الصياغة تلقائيًا. بعد الإضافة يمكنك إعادة تحليلها واختيار ما تريدين تحديثه.</small>
         </div>
         {supportingNote ? <Notice tone={supportingError ? "error" : "info"}>{supportingNote}</Notice> : null}
+        {pendingSupporting?.length ? (
+          <div className="ath-actions">
+            <button type="button" className="ath-btn primary fit" onClick={continueSupportingImages} disabled={supportingBusy}>
+              <Glyph name="upload" size={16} />متابعة
+            </button>
+            <button type="button" className="ath-btn outline fit" onClick={() => { setPendingSupporting(null); setSupportingNote(""); }}>
+              إلغاء
+            </button>
+          </div>
+        ) : null}
 
         {supportingImages.length ? (
           <div className="rv-reanalysis">

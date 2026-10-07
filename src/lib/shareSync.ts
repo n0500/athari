@@ -1,4 +1,4 @@
-import { ensureDriveAccessToken } from "@/lib/auth";
+import { getStoredDriveToken } from "@/lib/auth";
 import { revokePortfolioPermissions } from "@/lib/drive";
 import { listUserEvidence } from "@/lib/firestore";
 import { forgetPermissions, pruneActiveShare } from "@/lib/portfolioShare";
@@ -24,8 +24,12 @@ export async function syncShareWithApproved(uid: string): Promise<ShareSyncResul
   if (!changed) return "unchanged";
   if (!dropped.length) return "synced";
 
+  // This runs after other work, so a Google window here would be blocked by the
+  // browser. Without a current token the withdrawal waits for the next share update.
+  const token = getStoredDriveToken();
+  if (!token) return "revoke_pending";
+
   try {
-    const token = await ensureDriveAccessToken();
     await revokePortfolioPermissions(token, dropped);
     await forgetPermissions(shareId, dropped);
     return "synced";
