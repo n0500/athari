@@ -61,6 +61,77 @@ html[data-athari-theme="glass"] .ath .ath-sec-head h2::after { background: linea
 html[data-athari-theme="glass"] .ath-stats { background: rgba(255,255,255,.6); border-radius: 22px; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 html[data-athari-theme="glass"] .ath-hero .ath-btn.primary { background: #fff; color: #2338C4; box-shadow: 0 8px 16px -10px rgba(0,0,0,.5); }
 
+/* ======== Structural identity: each theme composes the element boxes differently ======== */
+
+/* الأصلي المطوَّر — vertical tiles: large icon on top, name below, count pill, colour bar on top. */
+html[data-athari-theme="original"] .ath .ath-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html[data-athari-theme="original"] .ath .ath-grid .ath-el {
+  flex-direction: column; justify-content: flex-start; align-items: center; text-align: center;
+  gap: 10px; padding: 22px 14px 18px; min-height: 0;
+  border-inline-start: 1px solid rgba(36,72,120,.14);
+  border-top: 5px solid var(--el-accent, #1d5fd6);
+}
+html[data-athari-theme="original"] .ath .ath-grid .ath-el .art { order: -1; width: 84px; height: 84px; padding: 10px; }
+html[data-athari-theme="original"] .ath .ath-grid .ath-el .txt { align-items: center; }
+html[data-athari-theme="original"] .ath .ath-grid .ath-el .ev.on { align-self: center; }
+html[data-athari-theme="original"] .ath .ath-grid .ath-el .mark { top: 12px; left: 12px; }
+@media (min-width: 900px) {
+  html[data-athari-theme="original"] .ath-frame.is-wide .ath-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+  html[data-athari-theme="original"] .ath-frame.is-wide .ath-grid .ath-el { padding: 26px 16px 22px; min-height: 0; }
+  html[data-athari-theme="original"] .ath-frame.is-wide .ath-grid .ath-el .art { width: 104px; height: 104px; }
+  html[data-athari-theme="original"] .ath-frame.is-wide .ath-grid .ath-el .nm { font-size: 18px; }
+}
+
+/* توقيع أثري — numbered register: gold numeral, Naskh headings, flat ivory rows, double rule. */
+html[data-athari-theme="signature"] .ath h1, html[data-athari-theme="signature"] .ath h2,
+html[data-athari-theme="signature"] .ath .sec-title, html[data-athari-theme="signature"] .ath .ath-el .nm,
+html[data-athari-theme="signature"] .idc-id h2 { font-family: "Amiri", "Tajawal", serif; font-weight: 700; }
+html[data-athari-theme="signature"] .ath .ath-hero h1 { font-size: 36px; letter-spacing: 0; }
+html[data-athari-theme="signature"] .ath .ath-grid { counter-reset: sigel; grid-template-columns: 1fr; gap: 0; border: 1px solid rgba(201,164,76,.55); border-radius: 14px; overflow: hidden; background: #FFFDF8; }
+html[data-athari-theme="signature"] .ath .ath-grid .ath-el {
+  counter-increment: sigel; background: transparent; border: 0; border-radius: 0; box-shadow: none;
+  border-bottom: 1px solid rgba(201,164,76,.35); min-height: 0; padding: 14px 16px; gap: 14px;
+}
+html[data-athari-theme="signature"] .ath .ath-grid .ath-el:last-child { border-bottom: 0; }
+html[data-athari-theme="signature"] .ath .ath-grid .ath-el::before {
+  content: counter(sigel, arabic-indic); flex: none; width: 40px; text-align: center;
+  font-family: "Amiri", serif; font-size: 30px; line-height: 1; color: #C9A44C; font-weight: 700;
+}
+html[data-athari-theme="signature"] .ath .ath-grid .ath-el .art { width: 48px; height: 48px; padding: 0; background: none; }
+html[data-athari-theme="signature"] .ath .ath-grid .ath-el .nm { font-size: 18px; }
+html[data-athari-theme="signature"] .ath .ath-grid .ath-el .mark { position: static; }
+@media (min-width: 900px) {
+  html[data-athari-theme="signature"] .ath-frame.is-wide .ath-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-athari-theme="signature"] .ath-frame.is-wide .ath-grid .ath-el { min-height: 96px; padding: 16px 22px; border-radius: 0; }
+  html[data-athari-theme="signature"] .ath-frame.is-wide .ath-grid .ath-el:nth-child(odd) { border-inline-start: 1px solid rgba(201,164,76,.35); }
+  html[data-athari-theme="signature"] .ath-frame.is-wide .ath-grid .ath-el .nm { font-size: 20px; }
+}
+html[data-athari-theme="signature"] .ath .sec-card { outline: 1px solid rgba(201,164,76,.45); outline-offset: -7px; }
+
+/* زجاجي — floating bubbles: vivid blurred backdrop, round glass icons, pill buttons. */
+html[data-athari-theme="glass"] .ath { position: relative; isolation: isolate; }
+html[data-athari-theme="glass"] .ath::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(420px 360px at 12% 18%, rgba(127,211,247,.75), rgba(127,211,247,0) 70%),
+    radial-gradient(480px 400px at 88% 30%, rgba(167,139,250,.55), rgba(167,139,250,0) 70%),
+    radial-gradient(520px 420px at 40% 95%, rgba(255,166,196,.5), rgba(255,166,196,0) 70%);
+}
+html[data-athari-theme="glass"] .ath .ath-btn { border-radius: 999px; }
+html[data-athari-theme="glass"] .ath .ath-grid { gap: 16px; }
+html[data-athari-theme="glass"] .ath .ath-grid .ath-el {
+  border: 1px solid rgba(255,255,255,.9); border-inline-start-width: 1px; border-radius: 34px;
+  background: linear-gradient(135deg, rgba(255,255,255,.78), rgba(255,255,255,.42));
+  box-shadow: 0 20px 40px -24px rgba(35,56,196,.55), inset 0 1px 0 rgba(255,255,255,.9);
+  padding-inline-end: 22px;
+}
+html[data-athari-theme="glass"] .ath .ath-grid .ath-el .art { border-radius: 50%; background: rgba(255,255,255,.75); box-shadow: 0 8px 18px -10px rgba(35,56,196,.6), inset 0 0 0 1px rgba(255,255,255,.9); padding: 10px; }
+html[data-athari-theme="glass"] .ath .ath-grid .ath-el .ev.on { border-radius: 999px; background: rgba(61,90,254,.12); color: #2338C4; }
+html[data-athari-theme="glass"] .ath .sec-card { border-radius: 32px; background: linear-gradient(135deg, rgba(255,255,255,.8), rgba(255,255,255,.5)); }
+html[data-athari-theme="glass"] .ath .sec-impact { border-radius: 22px; background: rgba(255,255,255,.55); }
+html[data-athari-theme="glass"] .ath-hero { border-radius: 36px; }
+html[data-athari-theme="glass"] .ath-hero-figs .fig { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); background: rgba(255,255,255,.2); }
+
 /* Print: flat, no blur, so PDFs stay crisp. */
 @media print {
   html[data-athari-theme] .ath-el, html[data-athari-theme] .sec-card, html[data-athari-theme] .idc, html[data-athari-theme] .ath-stats { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; box-shadow: none !important; }
