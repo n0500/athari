@@ -226,6 +226,12 @@ export function PortfolioHero({
           <h1>ملف الأداء المهني{name ? <><br />{name}</> : null}</h1>
         </div>
         {showCoverage ? <CoverageRing percent={percent} loading={loading} /> : null}
+        {!showCoverage && !loading ? (
+          <div className="ath-hero-figs">
+            <div className="fig"><b>{evidenceCount}</b><span>{evidenceCount === 1 ? "شاهد معتمد" : evidenceCount === 2 ? "شاهدان معتمدان" : evidenceCount <= 10 ? "شواهد معتمدة" : "شاهدًا معتمدًا"}</span></div>
+            <div className="fig"><b>{covered}</b><span>{covered === 1 ? "عنصر موثق" : covered === 2 ? "عنصران موثقان" : covered <= 10 ? "عناصر موثقة" : "عنصرًا موثقًا"}</span></div>
+          </div>
+        ) : null}
       </div>
       <p className="ath-hero-meta">
         {loading
