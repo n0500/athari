@@ -7,7 +7,6 @@ import {
   CountChip,
   ElementDetail,
   ElementGrid,
-  EvidenceTiles,
   Glyph,
   Panel,
   PortfolioHero,
@@ -16,7 +15,7 @@ import {
 } from "@/components/athari-ui/Ui";
 import { ProfessionalIdentityCard } from "@/components/ProfessionalIdentityCard";
 import { EvidenceReport } from "@/components/EvidenceReport";
-import { ElementExcellence } from "@/components/ElementExcellence";
+import { ShareEvidenceCard } from "@/components/ShareEvidenceCard";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import { ELEMENT_GUIDANCE } from "@/data/element-guidance";
 import { requirementsForElement } from "@/data/mandatory-requirements";
@@ -180,17 +179,26 @@ export default function PublicSharePage() {
       count: evidence.length,
     }));
 
-  const tiles = allEvidence.map((item) => {
+  function cardFor(item: ShareEvidence) {
     const primary = item.classifications.find((entry) => entry.isPrimary) ?? item.classifications[0];
-    return {
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      elementId: primary?.elementId,
-      elementName: primary?.elementName,
-      view: { onClick: () => setReport(item) },
-    };
-  });
+    return (
+      <ShareEvidenceCard
+        key={item.id}
+        item={{
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          impact: item.impact,
+          highlight: item.highlight,
+          elementId: primary?.elementId,
+          elementName: primary?.elementName,
+          attachments: item.attachments,
+        }}
+        onOpenReport={() => setReport(item)}
+        onOpenAttachment={(index) => openSpecificAttachment(item, index)}
+      />
+    );
+  }
 
   const activeCompleted = activeGroup
     ? completedRequirementsForElement(activeGroup.evidence, activeGroup.element.id)
@@ -218,15 +226,6 @@ export default function PublicSharePage() {
               category={activeGroup.element.category}
               description={activeGroup.element.description}
               supports={ELEMENT_GUIDANCE[activeGroup.element.id]?.supports ?? []}
-              excellence={
-                <ElementExcellence
-                  sources={activeGroup.evidence.map((item) => ({ id: item.id, title: item.title, highlight: item.highlight }))}
-                  onOpenEvidence={(id) => {
-                    const found = activeGroup.evidence.find((entry) => entry.id === id);
-                    if (found) setReport(found);
-                  }}
-                />
-              }
               crumbs={[{ label: "ملف الأداء", tap: { onClick: () => setActiveElementId(null) } }, { label: "عناصر التقييم", tap: { onClick: () => setActiveElementId(null) } }]}
               evidence={activeGroup.evidence.map((item) => ({
                 id: item.id,
@@ -249,6 +248,11 @@ export default function PublicSharePage() {
                   </>
                 ),
               }))}
+              evidenceList={
+                <div className="sec-list">
+                  {activeGroup.evidence.map((item) => cardFor(item))}
+                </div>
+              }
             />
 
             {activeDocumented.length ? (
@@ -312,7 +316,7 @@ export default function PublicSharePage() {
                 sub={`${allEvidence.length} ${allEvidence.length === 1 ? "شاهد معتمد" : "شواهد معتمدة"}`}
               />
             </div>
-            <EvidenceTiles items={tiles} />
+            <div className="sec-list">{allEvidence.map((item) => cardFor(item))}</div>
 
             <p className="ath-footnote">أثري · مشاركة ملف الأداء · للعرض فقط</p>
           </>

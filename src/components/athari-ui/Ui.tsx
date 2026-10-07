@@ -397,11 +397,13 @@ const SUPPORT_LOOK = [
 ];
 
 export function ElementDetail({
-  elementId, name, category, description, supports, evidence, loading, crumbs, excellence,
+  elementId, name, category, description, supports, evidence, loading, crumbs, excellence, evidenceList,
 }: {
   elementId: string; name: string; category?: string; description?: string; supports: string[];
   evidence: DetailEvidence[]; loading?: boolean; excellence?: ReactNode;
   crumbs: { label: string; tap?: Tap }[];
+  /** Replaces the default evidence rows (the principal's view uses its own cards). */
+  evidenceList?: ReactNode;
 }) {
   const cat = categoryLabel(category);
   return (
@@ -467,7 +469,7 @@ export function ElementDetail({
         title="الشواهد المعتمدة"
         sub={loading ? "جاري التحميل…" : evidence.length ? evidenceCountLabel(evidence.length) : "لا توجد شواهد معتمدة لهذا العنصر"}
       >
-        <div className="ath-ev-list">
+        {evidenceList ?? <div className="ath-ev-list">
           {evidence.map((item) => (
             <article className="ath-ev-item" key={item.id}>
               <div className="bd">
@@ -491,7 +493,7 @@ export function ElementDetail({
               <strong>لا يوجد شاهد معتمد لهذا العنصر حتى الآن</strong>
             </div>
           ) : null}
-        </div>
+        </div>}
       </Panel>
     </>
   );

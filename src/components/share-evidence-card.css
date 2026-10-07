@@ -1,0 +1,159 @@
+/* Principal's view: one evidence per card, full width on phone and iPad.
+   Reading order and weight: title → element → description → impact (strong)
+   → excellence indicators (quieter) → attachments. No motion. */
+
+.sec-list { display: grid; gap: 14px; }
+
+.sec-card {
+  background: #fff;
+  border: 1px solid rgba(36, 72, 120, .16);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sec-title { margin: 0; font-size: 18px; font-weight: 800; line-height: 1.6; color: #0f213d; }
+.sec-card .sec-element { font-size: 13.5px; padding: 5px 12px; }
+
+.sec-desc {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.85;
+  color: #334155;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sec-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* Impact: the strongest block after the title. */
+.sec-impact {
+  background: #eef8f2;
+  border: 1px solid #cfe9db;
+  border-inline-start: 5px solid #178a55;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 6px;
+}
+.sec-impact .sec-label { color: #126b43; }
+.sec-impact p { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.85; color: #133a28; }
+
+/* Excellence indicators: lighter than the impact, never louder. */
+.sec-ind { display: grid; gap: 8px; padding-inline: 2px; }
+.sec-ind .sec-label { color: #8a5a10; }
+.sec-ind ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sec-ind li {
+  position: relative;
+  padding-inline-start: 20px;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #3b2f1a;
+}
+.sec-ind li::before {
+  content: "◆";
+  position: absolute;
+  inset-inline-start: 2px;
+  top: 0;
+  font-size: 10px;
+  line-height: 2.7;
+  color: #c68a1e;
+}
+/* Collapsed: each preview indicator stays within two lines. */
+.sec-ind:not(.is-open) > ul:first-of-type li {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sec-ind-more[hidden] { display: none; }
+
+.ath .sec-ind-toggle, .sec-ind-toggle {
+  justify-self: start;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #ecd39b;
+  background: #fffaf0;
+  color: #7a4d0e;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.ath .sec-ind-toggle:hover { background: #fdf1d6; }
+
+.sec-files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #e3eaf3;
+}
+.sec-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #334155;
+  background: #f1f4f8;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+.sec-file-links { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.ath .sec-file-links button, .sec-file-links button {
+  min-height: 36px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1d5fd6;
+  background: #eef4fd;
+  border: 0;
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.ath .sec-view, .sec-view {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1.5px solid #b9cdf1;
+  background: #fff;
+  color: #1d5fd6;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 380px) {
+  .sec-card { padding: 14px 12px; }
+  .sec-title { font-size: 17px; }
+  .ath .sec-view, .sec-view { margin-inline-start: 0; flex: 1 1 100%; justify-content: center; }
+}
+
+@media print {
+  .sec-card { break-inside: avoid; border-color: #cbd5e1; }
+  .sec-ind li { -webkit-line-clamp: unset !important; display: block !important; }
+  .sec-ind-more[hidden] { display: grid; }
+  .sec-impact { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

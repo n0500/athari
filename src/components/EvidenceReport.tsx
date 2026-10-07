@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Glyph } from "@/components/athari-ui/Ui";
 import { requirementsForElement } from "@/data/mandatory-requirements";
+import { excellenceIndicatorsFor } from "@/lib/excellenceIndicators";
 
 export type ReportEvidence = {
   id: string;
@@ -32,6 +33,8 @@ export type ReportMeta = {
 };
 
 const NO_IMPACT = "لا يوجد أثر موثق متاح حاليًا.";
+/** The full report lists at most this many excellence indicators. */
+const MAX_REPORT_INDICATORS = 5;
 
 function attachmentKind(mimeType: string, name: string) {
   const lower = name.toLowerCase();
@@ -129,6 +132,8 @@ export function EvidenceReport({
       .map((requirement) => ({ ...requirement, elementName: classification.elementName }));
   });
   const impact = item.impact && item.impact !== NO_IMPACT ? item.impact : "";
+  const indicators = excellenceIndicatorsFor({ highlight: item.highlight, description: item.description, impact })
+    .slice(0, MAX_REPORT_INDICATORS);
   const primary = ordered[0];
   const secondary = ordered.slice(1);
   const roleLine = [meta.specialization, meta.rank].filter(Boolean).join(" · ");
@@ -229,6 +234,15 @@ export function EvidenceReport({
             <section className="rp-sec">
               <h3>الأثر</h3>
               <div className="rp-box"><p>{impact}</p></div>
+            </section>
+          ) : null}
+
+          {indicators.length ? (
+            <section className="rp-sec">
+              <h3>مؤشرات التميز</h3>
+              <ul className="rp-ind">
+                {indicators.map((line, index) => <li key={index}>{line}</li>)}
+              </ul>
             </section>
           ) : null}
 
