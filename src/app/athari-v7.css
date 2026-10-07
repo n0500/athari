@@ -448,3 +448,11 @@ button.el-excel-proof:hover { background: #fbe6b0; }
   .idc { box-shadow: none; border: 1px solid #d6dee8; }
   .idc-head { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Auth gate: shown briefly while the sign-in state is checked. */
+.ath .ath-auth-wait {
+  padding: 48px 16px;
+  text-align: center;
+  color: #5b6b80;
+  font-size: 15px;
+}

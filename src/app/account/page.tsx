@@ -27,6 +27,7 @@ export default function AccountPage() {
   const [panel, setPanel] = useState<PanelKey>(null);
   const [busy, setBusy] = useState(false);
   const [cleanupMessage, setCleanupMessage] = useState("");
+  const [logoutError, setLogoutError] = useState("");
 
   useEffect(() => {
     return onAuthStateChanged(requireAuth(), setUser);
@@ -78,11 +79,14 @@ export default function AccountPage() {
   }
 
   async function signOutNow() {
+    if (!window.confirm("تسجيل الخروج من أثري على هذا الجهاز؟")) return;
     try {
       setBusy(true);
+      setLogoutError("");
       await logout();
       router.replace("/login");
-    } finally {
+    } catch {
+      setLogoutError("تعذر تسجيل الخروج الآن. يُرجى المحاولة مرة أخرى.");
       setBusy(false);
     }
   }
@@ -192,6 +196,7 @@ export default function AccountPage() {
         <Glyph name="logout" />
         {busy ? "جاري التنفيذ…" : "تسجيل الخروج"}
       </button>
+      {logoutError ? <Notice tone="error">{logoutError}</Notice> : null}
 
       <div className="ath-legal">
         <Link href="/privacy">سياسة الخصوصية</Link>

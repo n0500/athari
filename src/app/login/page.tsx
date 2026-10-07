@@ -1,21 +1,40 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { Glyph, Notice } from "@/components/athari-ui/Ui";
 import { HeroArt } from "@/components/athari-ui/Art";
-import { firebaseConfigured } from "@/lib/firebase";
-import { signInWithGoogleAndDrive } from "@/lib/auth";
+import { firebaseConfigured, requireAuth } from "@/lib/firebase";
+import { authErrorMessage, signInWithGoogleAndDrive } from "@/lib/auth";
+import { safeNextPath } from "@/components/AuthGate";
 import { ensureUserProfile } from "@/lib/firestore";
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [checking, setChecking] = useState(firebaseConfigured);
+  // While the button flow is signing in, it does the redirect itself (after the profile is saved).
+  const signingIn = useRef(false);
+
+  function nextPath() {
+    return safeNextPath(new URLSearchParams(window.location.search).get("next"));
+  }
+
+  // Already signed in (e.g. the login page was bookmarked): go straight in.
+  useEffect(() => {
+    if (!firebaseConfigured) return;
+    return onAuthStateChanged(requireAuth(), (user) => {
+      if (signingIn.current) return;
+      if (user) router.replace(nextPath());
+      else setChecking(false);
+    });
+  }, [router]);
 
   async function login() {
     try {
+      signingIn.current = true;
       setLoading(true);
       setError("");
       const user = await signInWithGoogleAndDrive();
@@ -23,9 +42,10 @@ export default function LoginPage() {
         displayName: user.displayName,
         email: user.email,
       });
-      router.push("/");
+      router.replace(nextPath());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذر تسجيل الدخول");
+      signingIn.current = false;
+      setError(authErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -51,8 +71,8 @@ export default function LoginPage() {
           </p>
 
           {firebaseConfigured ? (
-            <button type="button" className="ath-btn primary block" onClick={login} disabled={loading}>
-              {loading ? "جاري تسجيل الدخول…" : "تسجيل الدخول بحساب Google"}
+            <button type="button" className="ath-btn primary block" onClick={login} disabled={loading || checking}>
+              {checking ? "جاري التحقق…" : loading ? "جاري تسجيل الدخول…" : "تسجيل الدخول بحساب Google"}
               <Glyph name="chevLeft" size={18} />
             </button>
           ) : (
@@ -60,8 +80,6 @@ export default function LoginPage() {
           )}
 
           {error ? <Notice tone="error">{error}</Notice> : null}
-
-          <Link href="/" className="ath-btn outline block">معاينة الواجهة</Link>
 
         </div>
       </main>

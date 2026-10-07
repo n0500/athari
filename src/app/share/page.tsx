@@ -204,6 +204,7 @@ export default function PublicSharePage() {
   return (
     <>
       <AthShell
+        publicPage
         chips={["للعرض فقط"]}
         showNav={false}
         accountHref={null}

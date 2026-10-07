@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ReactNode, useEffect, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
+import { AuthGate } from "@/components/AuthGate";
 import { ElementArt, EvidenceThumb, HeroArt, HeroWave, lookFor } from "./Art";
 
 /* ---------------- helpers ---------------- */
@@ -136,6 +137,7 @@ export function AthShell({
   showNav = true,
   back,
   accountHref = "/account",
+  publicPage = false,
 }: {
   children: ReactNode;
   title?: string;
@@ -144,7 +146,20 @@ export function AthShell({
   showNav?: boolean;
   back?: Tap;
   accountHref?: string | null;
+  /** The principal's shared view is public; every other page needs a signed-in teacher. */
+  publicPage?: boolean;
 }) {
+  const content = (
+    <>
+      {title ? (
+        <div className="ath-page-head">
+          <h1>{title}</h1>
+          {subtitle ? <p>{subtitle}</p> : null}
+        </div>
+      ) : null}
+      {children}
+    </>
+  );
   return (
     <div className="ath">
       <div className={`ath-frame ${showNav ? "has-nav" : ""}`}>
@@ -164,13 +179,7 @@ export function AthShell({
           )}
         </header>
         <main className="ath-main">
-          {title ? (
-            <div className="ath-page-head">
-              <h1>{title}</h1>
-              {subtitle ? <p>{subtitle}</p> : null}
-            </div>
-          ) : null}
-          {children}
+          {publicPage ? content : <AuthGate>{content}</AuthGate>}
         </main>
       </div>
       {showNav ? <div className="no-print"><BottomNav /></div> : null}

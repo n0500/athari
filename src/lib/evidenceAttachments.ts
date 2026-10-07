@@ -1,5 +1,6 @@
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { requireDb } from "@/lib/firebase";
+import { clearStoredDriveToken } from "@/lib/auth";
 import {
   ensureAthariElementFolder,
   ensureAthariInbox,
@@ -47,7 +48,10 @@ export async function loadSupportingImagesForAnalysis(input: {
       { headers: { Authorization: `Bearer ${input.token}` } }
     );
 
-    if (response.status === 401) throw new Error("DRIVE_RECONNECT_REQUIRED");
+    if (response.status === 401) {
+      clearStoredDriveToken();
+      throw new Error("DRIVE_RECONNECT_REQUIRED");
+    }
     if (!response.ok) throw new Error(`DRIVE_ERROR_${response.status}`);
 
     const blob = await response.blob();
