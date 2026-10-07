@@ -80,3 +80,9 @@ html[data-athari-theme="executive"] .ath .ath-btn.primary { background: #A6784A;
 html[data-athari-theme="executive"] .idc-tabs button.on { border-bottom-color: #A6784A; }
 html[data-athari-theme="executive"] .ath .ath-sec-head h2::after { background: linear-gradient(90deg, #A6784A, #A6784A); }
 html[data-athari-theme="executive"] .ath .sec-card { border-top-color: #A6784A; }
+
+html[data-athari-theme="original"] .ath-hero .ath-btn.primary { background: #fff; color: #0E5A60; box-shadow: 0 6px 14px -8px rgba(0,0,0,.5); }
+html[data-athari-theme="formal"] .ath-hero .ath-btn.primary { background: #fff; color: #1F3A5F; box-shadow: 0 6px 14px -8px rgba(0,0,0,.5); }
+html[data-athari-theme="signature"] .ath-hero .ath-btn.primary { background: #fff; color: #0F5C4A; box-shadow: 0 6px 14px -8px rgba(0,0,0,.5); }
+html[data-athari-theme="editorial"] .ath-hero .ath-btn.primary { background: #fff; color: #3B2F2A; box-shadow: 0 6px 14px -8px rgba(0,0,0,.5); }
+html[data-athari-theme="executive"] .ath-hero .ath-btn.primary { background: #fff; color: #2B2E33; box-shadow: 0 6px 14px -8px rgba(0,0,0,.5); }
