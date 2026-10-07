@@ -25,6 +25,12 @@ export function filesLabel(n: number) {
   if (n >= 3 && n <= 10) return `${n} ملفات`;
   return `${n} ملفًا`;
 }
+export function elementsLabel(n: number) {
+  if (n === 1) return "عنصر تقييم واحد";
+  if (n === 2) return "عنصرا تقييم";
+  if (n >= 3 && n <= 10) return `${n} عناصر تقييم`;
+  return `${n} عنصر تقييم`;
+}
 export function categoryLabel(category?: string) {
   if (category === "common") return "العناصر المشتركة";
   if (category === "role_responsibility") return "الأدوار والمسؤوليات";
@@ -192,9 +198,12 @@ export function CoverageRing({ percent, loading }: { percent: number; loading?: 
 
 export function PortfolioHero({
   year, name, evidenceCount, covered, total, loading, browse, print, browseLabel = "استعراض الشواهد", extra,
+  showCoverage = true,
 }: {
   year: string; name: string; evidenceCount: number; covered: number; total: number; loading?: boolean;
   browse: Tap; print?: Tap; browseLabel?: string; extra?: ReactNode;
+  /** false in the principal's view: show what is documented, never a ratio or a gap. */
+  showCoverage?: boolean;
 }) {
   const percent = total ? Math.round((covered / total) * 100) : 0;
   return (
@@ -204,10 +213,14 @@ export function PortfolioHero({
           <span className="ath-pill-out"><Glyph name="cal" size={16} />العام الدراسي {year}</span>
           <h1>ملف الأداء المهني{name ? <><br />{name}</> : null}</h1>
         </div>
-        <CoverageRing percent={percent} loading={loading} />
+        {showCoverage ? <CoverageRing percent={percent} loading={loading} /> : null}
       </div>
       <p className="ath-hero-meta">
-        {loading ? "جاري تحميل الملف…" : <>{evidenceCountLabel(evidenceCount)} &nbsp;•&nbsp; {covered} من {total} عنصر تقييم</>}
+        {loading
+          ? "جاري تحميل الملف…"
+          : showCoverage
+          ? <>{evidenceCountLabel(evidenceCount)} &nbsp;•&nbsp; {covered} من {total} عنصر تقييم</>
+          : <>{evidenceCountLabel(evidenceCount)} &nbsp;•&nbsp; موزعة على {elementsLabel(covered)}</>}
       </p>
       <div className="ath-hero-btns no-print">
         <Tappable {...browse} className="ath-btn primary"><Glyph name="eye" />{browseLabel}</Tappable>
@@ -220,16 +233,20 @@ export function PortfolioHero({
 }
 
 export function StatStrip({
-  first, evidenceCount, covered, total,
+  first, evidenceCount, covered, total, showTotal = true,
 }: {
   first: { title: string; sub: string };
   evidenceCount: number; covered: number; total: number;
+  /** false in the principal's view: the number of documented elements only. */
+  showTotal?: boolean;
 }) {
   return (
     <section className="ath-stats">
       <div className="ath-stat s1"><div><span className="tt">{first.title}</span><small>{first.sub}</small></div><span className="ic"><Glyph name="lock" size={22} /></span></div>
       <div className="ath-stat s2"><div><b><CountUp value={evidenceCount} /></b><small>شواهد معتمدة</small></div><span className="ic"><Glyph name="doc" size={22} /></span></div>
-      <div className="ath-stat s3"><div><b><CountUp value={covered} /> من {total}</b><small>عنصر تقييم مغطى</small></div><span className="ic"><Glyph name="folder" size={22} /></span></div>
+      <div className="ath-stat s3"><div>{showTotal
+        ? <><b><CountUp value={covered} /> من {total}</b><small>عنصر تقييم مغطى</small></>
+        : <><b><CountUp value={covered} /></b><small>عناصر تقييم موثقة</small></>}</div><span className="ic"><Glyph name="folder" size={22} /></span></div>
     </section>
   );
 }
@@ -244,7 +261,7 @@ export function SectionHead({ icon, title, sub, side }: { icon: ReactNode; title
 }
 
 export function CountChip({ total }: { total: number }) {
-  return <span className="ath-count-chip"><Glyph name="dots" size={16} />{total} عنصر تقييم</span>;
+  return <span className="ath-count-chip"><Glyph name="dots" size={16} />{elementsLabel(total)}</span>;
 }
 
 export type ElementSummary = { id: string; name: string; count: number };

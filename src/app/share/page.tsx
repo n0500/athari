@@ -19,11 +19,9 @@ import { EvidenceReport } from "@/components/EvidenceReport";
 import { ElementExcellence } from "@/components/ElementExcellence";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import { ELEMENT_GUIDANCE } from "@/data/element-guidance";
-import {
-  MANDATORY_REQUIREMENT_COUNT,
-  requirementsForElement,
-} from "@/data/mandatory-requirements";
+import { requirementsForElement } from "@/data/mandatory-requirements";
 import { getPublicPortfolioShare } from "@/lib/portfolioShare";
+import { presentableEvidence } from "@/lib/shareText";
 import type {
   PortfolioShare,
   ShareAttachment,
@@ -97,7 +95,7 @@ export default function PublicSharePage() {
           setError("رابط المشاركة غير متاح أو أُوقف.");
           return;
         }
-        setShare(result);
+        setShare({ ...result, evidence: result.evidence.map(presentableEvidence) });
       })
       .catch(() => setError("رابط المشاركة غير متاح أو أُوقف."))
       .finally(() => setLoading(false));
@@ -128,17 +126,6 @@ export default function PublicSharePage() {
     () => uniqueEvidenceById(grouped.flatMap((group) => group.evidence)),
     [grouped]
   );
-
-  const completedRequirementIds = useMemo(() => {
-    const set = new Set<string>();
-    if (!share) return set;
-    for (const item of share.evidence) {
-      for (const classification of item.classifications) {
-        classification.requirementIds?.forEach((id) => set.add(id));
-      }
-    }
-    return set;
-  }, [share]);
 
   const activeGroup = activeElementId
     ? grouped.find((group) => group.element.id === activeElementId) ?? null
@@ -184,11 +171,14 @@ export default function PublicSharePage() {
     );
   }
 
-  const elementSummaries = grouped.map(({ element, evidence }) => ({
-    id: element.id,
-    name: element.officialName,
-    count: evidence.length,
-  }));
+  // The principal sees the elements the teacher documented, never the empty ones.
+  const elementSummaries = grouped
+    .filter(({ evidence }) => evidence.length > 0)
+    .map(({ element, evidence }) => ({
+      id: element.id,
+      name: element.officialName,
+      count: evidence.length,
+    }));
 
   const tiles = allEvidence.map((item) => {
     const primary = item.classifications.find((entry) => entry.isPrimary) ?? item.classifications[0];
@@ -202,10 +192,13 @@ export default function PublicSharePage() {
     };
   });
 
-  const activeRequirements = activeGroup ? requirementsForElement(activeGroup.element.id) : [];
   const activeCompleted = activeGroup
     ? completedRequirementsForElement(activeGroup.evidence, activeGroup.element.id)
     : new Set<string>();
+  // Only the documented requirements, in their official order.
+  const activeDocumented = activeGroup
+    ? requirementsForElement(activeGroup.element.id).filter((requirement) => activeCompleted.has(requirement.id))
+    : [];
   const reportEvidence = activeGroup ? activeGroup.evidence : allEvidence;
 
   return (
@@ -257,22 +250,19 @@ export default function PublicSharePage() {
               }))}
             />
 
-            {activeRequirements.length ? (
+            {activeDocumented.length ? (
               <Panel
-                icon={<Glyph name="bars" size={22} />}
-                title="بنود المتابعة الإلزامية"
-                sub={`${activeCompleted.size} من ${activeRequirements.length} بنود موثقة`}
+                icon={<Glyph name="check" size={22} />}
+                title="بنود المتابعة الموثقة"
+                sub="بنود هذا العنصر المثبتة بشواهد معتمدة."
               >
                 <div className="ath-stack">
-                  {activeRequirements.map((requirement) => {
-                    const done = activeCompleted.has(requirement.id);
-                    return (
-                      <div className="ath-file-row" key={requirement.id}>
-                        <span className="ic"><Glyph name={done ? "check" : "empty"} size={19} /></span>
-                        <div className="nm"><strong>{requirement.label}</strong><span>{done ? "موثق بشاهد معتمد" : "غير موثق في المشاركة الحالية"}</span></div>
-                      </div>
-                    );
-                  })}
+                  {activeDocumented.map((requirement) => (
+                    <div className="ath-file-row" key={requirement.id}>
+                      <span className="ic"><Glyph name="check" size={19} /></span>
+                      <div className="nm"><strong>{requirement.label}</strong><span>موثق بشاهد معتمد</span></div>
+                    </div>
+                  ))}
                 </div>
               </Panel>
             ) : null}
@@ -286,7 +276,7 @@ export default function PublicSharePage() {
               covered={covered}
               total={total}
               browse={{ onClick: () => document.getElementById("approved-evidence")?.scrollIntoView({ behavior: "smooth" }) }}
-              print={{ onClick: () => window.print() }}
+              showCoverage={false}
             />
 
             <ProfessionalIdentityCard
@@ -305,17 +295,10 @@ export default function PublicSharePage() {
               evidenceCount={share.evidence.length}
               covered={covered}
               total={total}
+              showTotal={false}
             />
 
-            <Panel
-              icon={<Glyph name="bars" size={22} />}
-              title="اكتمال بنود المتابعة الإلزامية"
-              sub={`${completedRequirementIds.size} من ${MANDATORY_REQUIREMENT_COUNT} بندًا موثقًا`}
-            >
-              <p className="ath-fine">يُحتسب البند عندما يكون مرتبطًا بشاهد معتمد ومؤكد من صاحبة الملف.</p>
-            </Panel>
-
-            <SectionHead icon={<Glyph name="bars" />} title="عناصر التقييم" side={<CountChip total={total} />} />
+            <SectionHead icon={<Glyph name="bars" />} title="عناصر التقييم الموثقة" side={<CountChip total={covered} />} />
             <ElementGrid
               elements={elementSummaries}
               tapFor={(id) => ({ onClick: () => { setActiveElementId(id); window.scrollTo({ top: 0 }); } })}
