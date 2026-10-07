@@ -13,7 +13,8 @@ import {
 } from "@/components/athari-ui/Ui";
 import { Scene } from "@/components/athari-ui/Art";
 import { InfoTip } from "@/components/InfoTip";
-import { SHARE_SYNC_PENDING_MESSAGE, syncShareWithApproved } from "@/lib/shareSync";
+import { getStoredDriveToken } from "@/lib/auth";
+import { autoRefreshShare } from "@/lib/shareRefresh";
 import { firebaseConfigured, requireAuth } from "@/lib/firebase";
 import {
   archiveEvidence,
@@ -94,12 +95,8 @@ export default function EvidencePage() {
 
   // Keep an active «مشاركة ملف الأداء» in step after a record leaves the file.
   async function afterRemoval(uid: string) {
-    try {
-      const result = await syncShareWithApproved(uid);
-      if (result === "revoke_pending") setNotice(SHARE_SYNC_PENDING_MESSAGE);
-    } catch {
-      setNotice("تعذر تحديث مشاركة ملف الأداء الآن. حدّثيها من صفحة ملف الأداء.");
-    }
+    const note = await autoRefreshShare(uid, getStoredDriveToken());
+    if (note) setNotice(note);
   }
 
   async function archive(item: EvidenceRecord) {

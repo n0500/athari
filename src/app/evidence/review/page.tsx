@@ -6,6 +6,7 @@ import { AthShell, ElementArt, Glyph, Notice, Panel } from "@/components/athari-
 import { InfoTip } from "@/components/InfoTip";
 import { analyzeEvidence, suggestIndicators } from "@/lib/ai";
 import { requireAuth } from "@/lib/firebase";
+import { autoRefreshShare } from "@/lib/shareRefresh";
 import { DRIVE_CONTINUE_MESSAGE, ensureDriveAccessToken, getStoredDriveToken } from "@/lib/auth";
 import {
   ensureAthariElementFolder,
@@ -301,6 +302,8 @@ function ReviewInner() {
       };
       setItem(updated);
       await refreshBackupAfterAttachmentChange(user.uid, token);
+      const shareNote =
+        item.status === "approved" && result.added.length ? await autoRefreshShare(user.uid, token) : "";
 
       const addedCount = result.added.length;
       const skippedCount = result.skipped.length;
@@ -309,7 +312,7 @@ function ReviewInner() {
       } else if (addedCount) {
         setSupportingNote(
           item.status === "approved"
-            ? `تمت إضافة ${addedCount} ${addedCount === 1 ? "صورة" : "صور"} للشاهد. يمكنك إعادة تحليلها قبل تحديث المشاركة للمديرة.`
+            ? `تمت إضافة ${addedCount} ${addedCount === 1 ? "صورة" : "صور"} للشاهد، وظهرت في مشاركة ملف الأداء. ${shareNote}`.trim()
             : `تمت إضافة ${addedCount} ${addedCount === 1 ? "صورة" : "صور"} للشاهد. التحليل اختياري ويمكن تشغيله من الزر أدناه.`
         );
       } else {
@@ -360,6 +363,7 @@ function ReviewInner() {
         // After other awaits a Google window would be blocked; refresh the backup only with a current token.
         const token = getStoredDriveToken();
         if (token) await refreshBackupAfterAttachmentChange(user.uid, token);
+        if (item.status === "approved") await autoRefreshShare(user.uid, token);
       } catch {
         // Removing the attachment from the evidence does not require Drive deletion.
       }
@@ -587,7 +591,9 @@ function ReviewInner() {
         // Approval is already committed; backup can be refreshed later.
       }
 
-      router.push("/portfolio?added=1");
+      // Keep the principal's link in step with the newly approved content.
+      const shareNote = await autoRefreshShare(user.uid, token);
+      router.push(shareNote ? "/portfolio?added=1&share_pending=1" : "/portfolio?added=1");
     } catch (caught) {
       const raw = caught instanceof Error ? caught.message : "UNKNOWN";
 

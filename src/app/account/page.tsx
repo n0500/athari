@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { AthShell, ElementArt, Glyph, Notice } from "@/components/athari-ui/Ui";
-import { SHARE_SYNC_PENDING_MESSAGE, syncShareWithApproved } from "@/lib/shareSync";
+import { autoRefreshShare } from "@/lib/shareRefresh";
 import { HeroWave } from "@/components/athari-ui/Art";
 import { getStoredDriveToken, logout } from "@/lib/auth";
 import { requireAuth } from "@/lib/firebase";
@@ -61,8 +61,8 @@ export default function AccountPage() {
       const result = await cleanupDuplicateEvidence(user.uid);
       let shareNote = "";
       if (result.archivedCount) {
-        const sync = await syncShareWithApproved(user.uid).catch(() => "revoke_pending" as const);
-        if (sync === "revoke_pending") shareNote = ` ${SHARE_SYNC_PENDING_MESSAGE}`;
+        const note = await autoRefreshShare(user.uid, getStoredDriveToken());
+        if (note) shareNote = ` ${note}`;
       }
       setCleanupMessage(
         result.archivedCount

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Glyph, Notice, Panel } from "@/components/athari-ui/Ui";
 import { InfoTip } from "@/components/InfoTip";
 import { DRIVE_CONTINUE_MESSAGE, ensureDriveAccessToken, getStoredDriveToken } from "@/lib/auth";
+import { autoRefreshShare } from "@/lib/shareRefresh";
 import {
   DOCUMENT_SLOTS,
   MAX_DOCUMENT_BYTES,
@@ -53,8 +54,10 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
   async function persist(next: ProfessionalDocument[], success: string) {
     const saved = await saveProfessionalDocuments(uid, next);
     setDocuments(orderedDocuments(saved));
+    // Keep the principal's link in step (no-op when nothing is shared yet).
+    const shareNote = await autoRefreshShare(uid, getStoredDriveToken());
     setIsError(false);
-    setMessage(`${success} سيظهر التغيير للمديرة عند إنشاء المشاركة أو الضغط على «تحديث المشاركة».`);
+    setMessage(shareNote ? `${success} ${shareNote}` : success);
   }
 
   function pick(target: Target) {
@@ -186,7 +189,7 @@ export function ProfessionalDocumentsPanel({ uid }: { uid: string }) {
     <Panel
       icon={<Glyph name="folder" size={22} />}
       title="الوثائق المهنية"
-      sub="وثائق ثابتة تُرفع مرة واحدة، وتظهر جميعها للمديرة عند إنشاء المشاركة أو تحديثها."
+      sub="وثائق ثابتة تُرفع مرة واحدة، وتظهر جميعها للمديرة في مشاركة ملف الأداء."
     >
       <input
         ref={inputRef}

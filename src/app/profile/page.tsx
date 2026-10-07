@@ -13,6 +13,8 @@ import {
   saveProfessionalProfile,
 } from "@/lib/professionalProfile";
 import { listUserEvidence } from "@/lib/firestore";
+import { getStoredDriveToken } from "@/lib/auth";
+import { autoRefreshShare } from "@/lib/shareRefresh";
 import type { EvidenceRecord, ProfessionalProfile } from "@/types/athari";
 
 function lines(value: string) {
@@ -144,7 +146,9 @@ export default function ProfessionalProfilePage() {
       setProfile(saved);
       setAchievementsText(saved.achievements.join("\n"));
       setGoalsText(saved.developmentGoals.join("\n"));
-      setMessage("تم حفظ الهوية المهنية.");
+      // Keep the principal's link in step (no-op when nothing is shared yet).
+      const shareNote = await autoRefreshShare(user.uid, getStoredDriveToken());
+      setMessage(shareNote ? `تم حفظ الهوية المهنية. ${shareNote}` : "تم حفظ الهوية المهنية.");
     } catch {
       setIsError(true);
       setMessage("تعذر حفظ الهوية المهنية الآن. حاولي مرة أخرى.");

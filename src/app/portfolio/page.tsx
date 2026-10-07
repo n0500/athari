@@ -19,93 +19,16 @@ import { Scene } from "@/components/athari-ui/Art";
 import { Icon } from "@/components/Icon";
 import { firebaseConfigured, requireAuth } from "@/lib/firebase";
 import { ensureDriveAccessToken } from "@/lib/auth";
-import {
-  newlyAddedPermissions,
-  publishPortfolioFiles,
-  revokePortfolioPermissions,
-} from "@/lib/drive";
+import { revokePortfolioPermissions } from "@/lib/drive";
 import { listUserEvidence } from "@/lib/firestore";
 import { getProfessionalProfile } from "@/lib/professionalProfile";
-import { getProfessionalDocuments, orderedDocuments } from "@/lib/professionalDocuments";
-import {
-  createOrUpdatePortfolioShare,
-  forgetPermissions,
-  getActivePortfolioShare,
-  revokePortfolioShare,
-} from "@/lib/portfolioShare";
+import { getActivePortfolioShare, revokePortfolioShare } from "@/lib/portfolioShare";
+import { classificationsFor, refreshPortfolioShare, SHARE_NEEDS_UPDATE_MESSAGE } from "@/lib/shareRefresh";
 import { InfoTip } from "@/components/InfoTip";
-import type {
-  ShareDrivePermission,
-  ShareEvidence,
-} from "@/lib/portfolioShare";
+import type { ShareDrivePermission } from "@/lib/portfolioShare";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import { MANDATORY_REQUIREMENT_COUNT } from "@/data/mandatory-requirements";
-import {
-  ApprovedClassification,
-  EvidenceAttachment,
-  EvidenceRecord,
-  ProfessionalProfile,
-} from "@/types/athari";
-
-function classificationsFor(item: EvidenceRecord): ApprovedClassification[] {
-  const approved = item.approvedContent;
-  if (!approved) return [];
-
-  if (approved.classifications?.length) {
-    return approved.classifications.slice(0, 3);
-  }
-
-  if (approved.elementId && approved.elementName) {
-    return [
-      {
-        elementId: approved.elementId,
-        elementName: approved.elementName,
-        isPrimary: true,
-        requirementIds: [],
-      },
-    ];
-  }
-
-  return [];
-}
-
-function attachmentsFor(item: EvidenceRecord): EvidenceAttachment[] {
-  if (item.attachments?.length) return item.attachments;
-  return [
-    {
-      originalFileName: item.originalFileName,
-      mimeType: item.mimeType,
-      fileSize: item.fileSize,
-      ...(item.driveFileId ? { driveFileId: item.driveFileId } : {}),
-      ...(item.driveWebViewLink
-        ? { driveWebViewLink: item.driveWebViewLink }
-        : {}),
-    },
-  ];
-}
-
-function shareEvidenceFor(items: EvidenceRecord[]): ShareEvidence[] {
-  return items.map((item) => ({
-    id: item.id,
-    title: item.approvedContent?.title || item.originalFileName,
-    description: item.approvedContent?.description || "",
-    impact: item.approvedContent?.impact || "",
-    highlight: item.approvedContent?.highlight || "",
-    classifications: classificationsFor(item).map((classification) => ({
-      elementId: classification.elementId,
-      elementName: classification.elementName,
-      isPrimary: classification.isPrimary,
-      requirementIds: classification.requirementIds ?? [],
-    })),
-    attachments: attachmentsFor(item).map((attachment) => ({
-      originalFileName: attachment.originalFileName,
-      mimeType: attachment.mimeType,
-      ...(attachment.driveFileId
-        ? { driveFileId: attachment.driveFileId }
-        : {}),
-    })),
-  }));
-}
+import { EvidenceRecord, ProfessionalProfile } from "@/types/athari";
 
 export default function PortfolioPage() {
   const [items, setItems] = useState<EvidenceRecord[]>([]);
@@ -120,6 +43,7 @@ export default function PortfolioPage() {
   const [shareMessage, setShareMessage] = useState("");
   const [justAdded, setJustAdded] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [sharePending, setSharePending] = useState(false);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("share") === "1") setShareOpen(true);
@@ -127,6 +51,7 @@ export default function PortfolioPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("share_pending") === "1") setSharePending(true);
     if (params.get("added") !== "1") return;
     setJustAdded(true);
     window.history.replaceState(null, "", window.location.pathname);
@@ -227,88 +152,27 @@ export default function PortfolioPage() {
       setShareMessage("");
       // Ask Google first, while still inside the tap, so the browser shows no pop-up warning.
       const token = await ensureDriveAccessToken();
+      const result = await refreshPortfolioShare(user.uid, {
+        token,
+        create: true,
+        fullCheck: true,
+        fallbackName: user.displayName?.trim() || "",
+      });
+      if (!result.shareId) throw new Error("SHARE_NOT_SAVED");
 
-      // Re-read professional documents at the moment of sharing. Never rely on a
-      // possibly failed/stale page-load snapshot, because that could accidentally
-      // remove documents from the principal's existing share.
-      let latestDocuments: Awaited<ReturnType<typeof getProfessionalDocuments>>;
-      try {
-        latestDocuments = orderedDocuments(await getProfessionalDocuments(user.uid));
-      } catch {
-        throw new Error("PROFESSIONAL_DOCUMENTS_READ_FAILED");
-      }
-      const shareDocuments = latestDocuments;
-      const currentFileIds = [
-        ...new Set(
-          items
-            .flatMap((item) =>
-              attachmentsFor(item)
-                .map((attachment) => attachment.driveFileId)
-                .filter((value): value is string => Boolean(value))
-            )
-            .concat(shareDocuments.map((entry) => entry.driveFileId))
-        ),
-      ];
-
-      const currentShare = await getActivePortfolioShare(user.uid).catch(() => null);
-      const previousPermissions = currentShare?.drivePermissions ?? sharePermissions;
-
-      const published = await publishPortfolioFiles(token, currentFileIds, previousPermissions);
-
-      const currentIds = new Set(currentFileIds);
-      const removedPermissions = previousPermissions.filter(
-        (permission) => !currentIds.has(permission.driveFileId)
-      );
-
-      let share: Awaited<ReturnType<typeof createOrUpdatePortfolioShare>>;
-      try {
-        share = await createOrUpdatePortfolioShare({
-          uid: user.uid,
-          ownerDisplayName: professionalProfile?.fullName || user.displayName?.trim() || "صاحبة الملف",
-          academicYear: year,
-          evidence: shareEvidenceFor(items),
-          drivePermissions: [...published, ...removedPermissions],
-          ...(professionalProfile ? { professionalProfile } : {}),
-          documents: shareDocuments.map((entry) => ({
-            kind: entry.kind,
-            label: entry.label,
-            originalFileName: entry.originalFileName,
-            mimeType: entry.mimeType,
-            driveFileId: entry.driveFileId,
-          })),
-        });
-      } catch (shareError) {
-        await revokePortfolioPermissions(
-          token,
-          newlyAddedPermissions(published, previousPermissions)
-        ).catch(() => undefined);
-        throw shareError;
-      }
-
-      let kept = [...published, ...removedPermissions];
-      if (removedPermissions.length) {
-        try {
-          await revokePortfolioPermissions(token, removedPermissions);
-          await forgetPermissions(share.id, removedPermissions);
-          kept = published;
-        } catch {
-          // Left recorded on the share; the next update retries it.
-        }
-      }
-
-      const url = `${window.location.origin}/share?token=${share.id}`;
-      setShareId(share.id);
-      setSharePermissions(kept);
+      const share = await getActivePortfolioShare(user.uid).catch(() => null);
+      const url = `${window.location.origin}/share?token=${result.shareId}`;
+      setShareId(result.shareId);
+      setSharePermissions(share?.drivePermissions ?? []);
       setShareUrl(url);
+      setSharePending(false);
       await copyShareLink(url);
     } catch (caught) {
       const raw = caught instanceof Error ? caught.message : "UNKNOWN";
       setShareMessage(
         raw === "DRIVE_RECONNECT_REQUIRED"
           ? "يرجى تسجيل الدخول إلى Google ثم إعادة المحاولة."
-          : raw === "PROFESSIONAL_DOCUMENTS_READ_FAILED"
-          ? "تعذر قراءة الوثائق المهنية الآن؛ لم يتم تغيير رابط المشاركة الحالي أو صلاحياته."
-          : "تعذر حفظ المشاركة الآن، ولم تُمنح أي صلاحية جديدة على ملفاتك."
+          : "تعذر حفظ المشاركة الآن، ولم يتغير رابط المشاركة الحالي."
       );
     } finally {
       setShareBusy(false);
@@ -382,6 +246,10 @@ export default function PortfolioPage() {
         </section>
       ) : null}
 
+      {sharePending ? (
+        <Notice tone="error">{SHARE_NEEDS_UPDATE_MESSAGE}</Notice>
+      ) : null}
+
       <PortfolioHero
         year={year}
         name={ownerName}
@@ -425,6 +293,7 @@ export default function PortfolioPage() {
                   <button type="button" className="ath-btn primary" onClick={() => copyShareLink(shareUrl)}><Icon name="copy" size={17} /> نسخ الرابط</button>
                   <button type="button" className="ath-btn outline" onClick={createShare} disabled={shareBusy || !items.length}>{shareBusy ? "جاري التحديث…" : "تحديث المشاركة"}</button>
                 </div>
+                <p className="ath-fine">تتحدّث المشاركة تلقائيًا عند اعتماد شاهد أو تعديله، أو تعديل الهوية المهنية أو الوثائق المهنية. استخدمي «تحديث المشاركة» عند ظهور تنبيه بذلك فقط.</p>
                 <button type="button" className="ath-btn danger" onClick={revokeShare} disabled={shareBusy}>إيقاف المشاركة</button>
               </>
             ) : (
