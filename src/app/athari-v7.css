@@ -587,3 +587,12 @@ button.el-excel-proof:hover { background: #fbe6b0; }
   .ath-frame.is-wide .idc-chips { gap: 10px; }
   .ath-frame.is-wide .idc-chips span { font-size: 15px; padding: 6px 16px; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.25); }
 }
+
+/* Principal's view: the owner's name is already the hero title, so the identity
+   banner shows the section label instead of repeating it (name stays for screen readers). */
+.ath-frame.is-wide .idc-id h2 {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.ath-frame.is-wide .idc-kicker { font-size: 18px; font-weight: 800; opacity: 1; display: block; margin-bottom: 8px; }
+@media (min-width: 900px) { .ath-frame.is-wide .idc-kicker { font-size: 26px; margin-bottom: 12px; } }
