@@ -132,6 +132,20 @@ html[data-athari-theme="glass"] .ath .sec-impact { border-radius: 22px; backgrou
 html[data-athari-theme="glass"] .ath-hero { border-radius: 36px; }
 html[data-athari-theme="glass"] .ath-hero-figs .fig { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); background: rgba(255,255,255,.2); }
 
+/* Illustrations (same pictures as the commercial version) replace the small icons in the optional themes. */
+.ath-el-pic { display: none; }
+html[data-athari-theme] .ath .ath-grid .ath-el .art { display: none; }
+html[data-athari-theme] .ath .ath-grid .ath-el .ath-el-pic { display: block; flex: none; object-fit: contain; width: 84px; height: 84px; }
+
+html[data-athari-theme="original"] .ath .ath-grid .ath-el .ath-el-pic { order: -1; width: 112px; height: 112px; margin-top: -4px; filter: drop-shadow(0 10px 12px rgba(15,45,90,.18)); }
+@media (min-width: 900px) { html[data-athari-theme="original"] .ath-frame.is-wide .ath-grid .ath-el .ath-el-pic { width: 132px; height: 132px; } }
+
+html[data-athari-theme="signature"] .ath .ath-grid .ath-el .ath-el-pic { width: 76px; height: 76px; }
+@media (min-width: 900px) { html[data-athari-theme="signature"] .ath-frame.is-wide .ath-grid .ath-el .ath-el-pic { width: 92px; height: 92px; } }
+
+html[data-athari-theme="glass"] .ath .ath-grid .ath-el .ath-el-pic { width: 96px; height: 96px; margin-inline-start: -6px; filter: drop-shadow(0 10px 14px rgba(35,56,196,.25)); }
+@media (min-width: 900px) { html[data-athari-theme="glass"] .ath-frame.is-wide .ath-grid .ath-el .ath-el-pic { width: 112px; height: 112px; } }
+
 /* Print: flat, no blur, so PDFs stay crisp. */
 @media print {
   html[data-athari-theme] .ath-el, html[data-athari-theme] .sec-card, html[data-athari-theme] .idc, html[data-athari-theme] .ath-stats { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; box-shadow: none !important; }

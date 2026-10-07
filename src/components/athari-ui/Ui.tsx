@@ -285,6 +285,25 @@ export function CountChip({ total }: { total: number }) {
 
 export type ElementSummary = { id: string; name: string; count: number };
 
+const ELEMENT_PICTURE: Record<string, string> = {
+  "teacher-duty-performance": "duty",
+  "professional-community-engagement": "community",
+  "parent-engagement": "parent",
+  "teaching-strategies-variety": "strategies",
+  "learner-results-improvement": "improve",
+  "learning-plan": "plan",
+  "learning-technology": "tech",
+  "learning-environment": "environment",
+  "classroom-management": "classroom",
+  "learner-results-analysis": "analysis",
+  "assessment-methods-variety": "assessment",
+};
+
+/** Illustration for an official element (files in /public/athari-assets). */
+function elementPicture(elementId: string) {
+  return `/athari-assets/element-${ELEMENT_PICTURE[elementId] ?? "duty"}.webp`;
+}
+
 export function ElementGrid({ elements, tapFor }: { elements: ElementSummary[]; tapFor: (id: string) => Tap }) {
   return (
     <div className="ath-grid">
@@ -300,6 +319,8 @@ export function ElementGrid({ elements, tapFor }: { elements: ElementSummary[]; 
               </span>
             </span>
             <ElementArt elementId={element.id} className="art" />
+            {/* Illustration used by the optional themes; hidden (and not fetched) in the current look. */}
+            <img className="ath-el-pic" src={elementPicture(element.id)} alt="" aria-hidden="true" loading="lazy" decoding="async" />
             <Glyph name={ok ? "check" : "empty"} size={24} className={ok ? "mark on" : "mark"} />
           </Tappable>
         );
