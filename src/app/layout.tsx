@@ -7,6 +7,8 @@ import "./athari-final.css";
 import "./athari-premium.css";
 import "./athari-mockup.css";
 import "./athari-v7.css";
+import "./athari-themes.css";
+import { ThemeRuntime } from "@/components/athari-theme/ThemeRuntime";
 
 export const metadata: Metadata = {
   title: "أثري | ملف الأداء المهني",
@@ -33,7 +35,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap"
         />
       </head>
-      <body>{children}</body>
+      <body><ThemeRuntime />{children}</body>
     </html>
   );
 }

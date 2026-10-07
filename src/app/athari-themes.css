@@ -1,0 +1,82 @@
+/* Optional appearance themes, chosen per device in الحساب → مظهر أثري.
+   Every rule sits under html[data-athari-theme="…"]; with no attribute ("الحالي")
+   nothing here applies, so the existing look is untouched. */
+
+.theme-studio { background: #fff; border: 1px solid rgba(36,72,120,.14); border-radius: 18px; padding: 16px; display: grid; gap: 12px; }
+.theme-studio h2 { margin: 0; font-size: 18px; font-weight: 800; color: #0f213d; }
+.theme-note { margin: 0; font-size: 13.5px; color: #475569; line-height: 1.7; }
+.theme-grid { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .theme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ath .theme-option {
+  display: flex; align-items: center; gap: 12px; text-align: start; width: 100%; min-height: 64px;
+  padding: 10px 12px; border-radius: 14px; border: 1.5px solid #d5dde8; background: #f8fafc;
+  font: inherit; color: #0f213d; cursor: pointer;
+}
+.ath .theme-option.is-selected { border-color: var(--sw-main); background: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw-main) 18%, transparent); }
+.theme-swatch { width: 52px; height: 40px; border-radius: 10px; background: var(--sw-bg); border: 1px solid rgba(0,0,0,.1); position: relative; flex: none; overflow: hidden; }
+.theme-swatch i { position: absolute; inset: 0 0 45% 0; background: var(--sw-main); }
+.theme-swatch b { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--sw-accent); bottom: 5px; inset-inline-start: 6px; }
+.theme-copy { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.theme-copy strong { font-size: 15px; font-weight: 800; }
+.theme-copy small { font-size: 12.5px; color: #475569; line-height: 1.5; }
+.theme-check { font-weight: 800; color: var(--sw-main); width: 18px; text-align: center; }
+
+/* ---- original ---- */
+html[data-athari-theme="original"] .ath {
+  --ath-bg: #EEF3F9; --ath-blue: #1D5FD6;
+  background: #EEF3F9;
+}
+html[data-athari-theme="original"] .ath-hero { background: linear-gradient(115deg, #0E5A60 0%, #0B4A4F 100%); }
+html[data-athari-theme="original"] .idc-head { background: linear-gradient(135deg, #0B4A4F, #0E5A60); }
+html[data-athari-theme="original"] .ath .ath-btn.primary { background: #1D5FD6; }
+html[data-athari-theme="original"] .idc-tabs button.on { border-bottom-color: #F2C14E; }
+html[data-athari-theme="original"] .ath .ath-sec-head h2::after { background: linear-gradient(90deg, #1D5FD6, #F2C14E); }
+html[data-athari-theme="original"] .ath .sec-card { border-top-color: #1D5FD6; }
+
+/* ---- formal ---- */
+html[data-athari-theme="formal"] .ath {
+  --ath-bg: #F4F6F9; --ath-blue: #2F6FE0;
+  background: #F4F6F9;
+}
+html[data-athari-theme="formal"] .ath-hero { background: linear-gradient(115deg, #1F3A5F 0%, #172C49 100%); }
+html[data-athari-theme="formal"] .idc-head { background: linear-gradient(135deg, #172C49, #1F3A5F); }
+html[data-athari-theme="formal"] .ath .ath-btn.primary { background: #2F6FE0; }
+html[data-athari-theme="formal"] .idc-tabs button.on { border-bottom-color: #2F6FE0; }
+html[data-athari-theme="formal"] .ath .ath-sec-head h2::after { background: linear-gradient(90deg, #2F6FE0, #2F6FE0); }
+html[data-athari-theme="formal"] .ath .sec-card { border-top-color: #2F6FE0; }
+
+/* ---- signature ---- */
+html[data-athari-theme="signature"] .ath {
+  --ath-bg: #F7F3EA; --ath-blue: #0F5C4A;
+  background: #F7F3EA;
+}
+html[data-athari-theme="signature"] .ath-hero { background: linear-gradient(115deg, #0F5C4A 0%, #0A4638 100%); }
+html[data-athari-theme="signature"] .idc-head { background: linear-gradient(135deg, #0A4638, #0F5C4A); }
+html[data-athari-theme="signature"] .ath .ath-btn.primary { background: #0F5C4A; }
+html[data-athari-theme="signature"] .idc-tabs button.on { border-bottom-color: #C9A44C; }
+html[data-athari-theme="signature"] .ath .ath-sec-head h2::after { background: linear-gradient(90deg, #0F5C4A, #C9A44C); }
+html[data-athari-theme="signature"] .ath .sec-card { border-top-color: #0F5C4A; }
+
+/* ---- editorial ---- */
+html[data-athari-theme="editorial"] .ath {
+  --ath-bg: #FBF7F0; --ath-blue: #B5563C;
+  background: #FBF7F0;
+}
+html[data-athari-theme="editorial"] .ath-hero { background: linear-gradient(115deg, #3B2F2A 0%, #2A211D 100%); }
+html[data-athari-theme="editorial"] .idc-head { background: linear-gradient(135deg, #2A211D, #3B2F2A); }
+html[data-athari-theme="editorial"] .ath .ath-btn.primary { background: #B5563C; }
+html[data-athari-theme="editorial"] .idc-tabs button.on { border-bottom-color: #B5563C; }
+html[data-athari-theme="editorial"] .ath .ath-sec-head h2::after { background: linear-gradient(90deg, #B5563C, #B5563C); }
+html[data-athari-theme="editorial"] .ath .sec-card { border-top-color: #B5563C; }
+
+/* ---- executive ---- */
+html[data-athari-theme="executive"] .ath {
+  --ath-bg: #F1F1F0; --ath-blue: #A6784A;
+  background: #F1F1F0;
+}
+html[data-athari-theme="executive"] .ath-hero { background: linear-gradient(115deg, #2B2E33 0%, #1F2226 100%); }
+html[data-athari-theme="executive"] .idc-head { background: linear-gradient(135deg, #1F2226, #2B2E33); }
+html[data-athari-theme="executive"] .ath .ath-btn.primary { background: #A6784A; }
+html[data-athari-theme="executive"] .idc-tabs button.on { border-bottom-color: #A6784A; }
+html[data-athari-theme="executive"] .ath .ath-sec-head h2::after { background: linear-gradient(90deg, #A6784A, #A6784A); }
+html[data-athari-theme="executive"] .ath .sec-card { border-top-color: #A6784A; }

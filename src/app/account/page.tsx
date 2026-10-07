@@ -1,5 +1,6 @@
 "use client";
 
+import { ThemePicker } from "@/components/athari-theme/ThemePicker";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
@@ -191,6 +192,8 @@ export default function AccountPage() {
           </div>
         ))}
       </div>
+
+      <ThemePicker />
 
       <button type="button" className="ath-btn danger block" onClick={signOutNow} disabled={busy}>
         <Glyph name="logout" />
