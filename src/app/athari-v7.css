@@ -498,3 +498,57 @@ button.el-excel-proof:hover { background: #fbe6b0; }
 .ath .ath-grid .ath-el.tone-cream { --el-accent: #c68a1e; }
 .ath .ath-grid .ath-el:hover { box-shadow: 0 10px 24px -10px rgba(15, 45, 90, .45), 0 1px 2px rgba(15, 45, 90, .08); }
 @media print { .ath .ath-grid .ath-el { box-shadow: none; } }
+
+/* ---------- Polish: refined element cards and evidence cards ---------- */
+.ath .ath-grid .ath-el {
+  background: linear-gradient(135deg, #fff 55%, color-mix(in srgb, var(--el-accent, #1d5fd6) 9%, #fff) 100%);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.ath .ath-grid .ath-el .art {
+  padding: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--el-accent, #1d5fd6) 12%, #fff);
+  box-sizing: border-box;
+}
+.ath .ath-grid .ath-el .nm { letter-spacing: 0; }
+.ath .ath-grid .ath-el .ev.on {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--el-accent, #1d5fd6) 78%, #000);
+  background: color-mix(in srgb, var(--el-accent, #1d5fd6) 12%, #fff);
+}
+.ath .ath-grid .ath-el .ev.off { font-weight: 600; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .ath .ath-grid .ath-el:hover { transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ath .ath-grid .ath-el { transition: none; }
+}
+
+/* Section headings: a short accent underline gives the page a rhythm. */
+.ath .ath-sec-head h2 { position: relative; padding-bottom: 8px; }
+.ath .ath-sec-head h2::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: 0;
+  width: 44px;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #1d5fd6, #178a55);
+}
+
+/* Evidence cards in the principal's view: soft depth and a calm accent edge. */
+.ath .sec-card {
+  border-color: rgba(36, 72, 120, .18);
+  border-top: 4px solid #1d5fd6;
+  box-shadow: 0 8px 22px -12px rgba(15, 45, 90, .35), 0 1px 2px rgba(15, 45, 90, .06);
+}
+.ath .sec-card .sec-title { font-size: 19px; }
+@media (min-width: 900px) {
+  .ath-frame.is-wide .sec-card { padding: 20px; border-radius: 20px; }
+  .ath-frame.is-wide .sec-title { font-size: 20px; }
+}
+@media print { .ath .sec-card { box-shadow: none; } }
