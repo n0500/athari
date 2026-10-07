@@ -94,6 +94,12 @@ html[data-athari-theme="signature"] .ath .ath-grid .ath-el {
 }
 html[data-athari-theme="signature"] .ath .ath-grid .ath-el .art { width: 56px; height: 56px; padding: 0; background: none; }
 html[data-athari-theme="signature"] .ath .ath-grid .ath-el .nm { font-size: 19px; }
+@media (max-width: 639px) {
+  html[data-athari-theme="signature"] .ath .ath-grid { grid-template-columns: 1fr; gap: 12px; }
+  html[data-athari-theme="signature"] .ath .ath-grid .ath-el { padding: 16px 18px; min-height: 92px; }
+  html[data-athari-theme="signature"] .ath .ath-grid .ath-el .art { width: 52px; height: 52px; }
+  html[data-athari-theme="signature"] .ath .ath-grid .ath-el .nm { font-size: 18px; }
+}
 @media (min-width: 900px) {
   html[data-athari-theme="signature"] .ath-frame.is-wide .ath-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
   html[data-athari-theme="signature"] .ath-frame.is-wide .ath-grid .ath-el { min-height: 124px; padding: 22px 24px; }
