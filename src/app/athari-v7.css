@@ -464,7 +464,16 @@ button.el-excel-proof:hover { background: #fbe6b0; }
    available width instead of a phone-width column. Phones are unchanged. */
 @media (min-width: 900px) {
   .ath-frame.is-wide { max-width: 1080px; padding-inline: 24px; }
-  .ath-frame.is-wide .ath-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  /* Evaluation elements are the main sections: larger cards, icons and names. */
+  .ath-frame.is-wide .ath-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .ath-frame.is-wide .ath-el { min-height: 136px; padding: 20px 18px 20px 20px; gap: 14px; border-radius: 20px; }
+  .ath-frame.is-wide .ath-el .art { width: 80px; height: 80px; }
+  .ath-frame.is-wide .ath-el .nm { font-size: 19px; line-height: 1.45; }
+  .ath-frame.is-wide .ath-el .ev { font-size: 15px; margin-top: 10px; }
+  .ath-frame.is-wide .ath-el .mark { top: 14px; left: 14px; width: 28px; height: 28px; }
+  .ath-frame.is-wide .ath-sec-head { margin-top: 14px; }
+  .ath-frame.is-wide .ath-sec-head h2 { font-size: 26px; }
+  .ath-frame.is-wide .ath-sec-head p { font-size: 15px; }
   .ath-frame.is-wide .sec-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
   .ath-frame.is-wide .ath-hero { padding: 26px 28px; }
   .ath-frame.is-wide .ath-hero h1 { font-size: 30px; }
@@ -472,5 +481,4 @@ button.el-excel-proof:hover { background: #fbe6b0; }
 }
 @media (min-width: 1280px) {
   .ath-frame.is-wide { max-width: 1200px; }
-  .ath-frame.is-wide .ath-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }

@@ -140,7 +140,8 @@
 }
 
 /* ---------- element grid (official order runs left→right like the mockup) ---------- */
-.ath-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; direction: ltr; }
+/* Arabic reading order: the first element sits at the top right. */
+.ath-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; direction: rtl; }
 .ath-el {
   direction: rtl; position: relative; border-radius: 16px; padding: 12px 10px 12px 12px;
   display: flex; align-items: center; gap: 8px; min-height: 92px; width: 100%; text-align: start;
