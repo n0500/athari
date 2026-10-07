@@ -3,13 +3,13 @@
 import { useEffect } from "react";
 
 /** "current" is the existing look: no theme attribute is set, so nothing changes. */
-export type AthariTheme = "current" | "original" | "formal" | "signature" | "editorial" | "executive";
+export type AthariTheme = "current" | "original" | "signature" | "glass";
 
 export const ATHARI_DEFAULT_THEME: AthariTheme = "current";
 export const ATHARI_THEME_STORAGE_KEY = "athari-theme";
 export const ATHARI_THEME_EVENT = "athari-theme-change";
 
-const THEMES: AthariTheme[] = ["current", "original", "formal", "signature", "editorial", "executive"];
+const THEMES: AthariTheme[] = ["current", "original", "signature", "glass"];
 
 export function isAthariTheme(value: string | null | undefined): value is AthariTheme {
   return THEMES.includes(value as AthariTheme);

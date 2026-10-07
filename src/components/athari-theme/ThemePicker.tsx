@@ -13,11 +13,9 @@ import {
 
 const THEMES: Array<{ id: AthariTheme; name: string; subtitle: string; colors: [string, string, string] }> = [
   { id: "current", name: "الحالي", subtitle: "المظهر المعتاد لأثري", colors: ["#EEF4FB", "#0F4E59", "#1D5FD6"] },
-  { id: "original", name: "الأصلي المطوَّر", subtitle: "الهوية الأصلية بمستوى أرقى", colors: ["#EEF3F9", "#0E5A60", "#F2C14E"] },
-  { id: "formal", name: "رسمي واضح", subtitle: "ألوان هادئة وتباين عالٍ يسهّل القراءة", colors: ["#F4F6F9", "#1F3A5F", "#2F6FE0"] },
-  { id: "signature", name: "توقيع أثري", subtitle: "الزمردي والعاجي بلمسة ذهبية", colors: ["#F7F3EA", "#0F5C4A", "#C9A44C"] },
-  { id: "editorial", name: "تحريري", subtitle: "إيقاع هادئ على ورق دافئ", colors: ["#FBF7F0", "#3B2F2A", "#B5563C"] },
-  { id: "executive", name: "تنفيذي", subtitle: "الجرافيتي والبرونزي بهندسة صارمة", colors: ["#F1F1F0", "#2B2E33", "#A6784A"] },
+  { id: "original", name: "الأصلي المطوَّر", subtitle: "بطاقات بيضاء مستديرة وظلال ناعمة وذهبي هادئ", colors: ["#EEF3F9", "#0E5A60", "#F2C14E"] },
+  { id: "signature", name: "توقيع أثري", subtitle: "الزمردي والعاجي بخطوط ذهبية دقيقة", colors: ["#F7F3EA", "#0F5C4A", "#C9A44C"] },
+  { id: "glass", name: "زجاجي", subtitle: "طبقات شفافة بتمويه خفيف وعمق بصري", colors: ["#E3ECFB", "#3D5AFE", "#7FD3F7"] },
 ];
 
 /** Appearance choice for this device only; it never changes the portfolio content. */
