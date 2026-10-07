@@ -11,7 +11,8 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const DRIVE_TOKEN_KEY = "athari_google_drive_access_token";
 const DRIVE_TOKEN_TIME_KEY = "athari_google_drive_access_token_saved_at";
 const DRIVE_TOKEN_UID_KEY = "athari_google_drive_access_token_uid";
-const DRIVE_TOKEN_MAX_AGE_MS = 50 * 60 * 1000;
+// Google access tokens last 60 minutes; stop using one a few minutes early.
+const DRIVE_TOKEN_MAX_AGE_MS = 55 * 60 * 1000;
 
 function provider(loginHint?: string | null) {
   const p = new GoogleAuthProvider();
@@ -53,33 +54,68 @@ export function authErrorMessage(error: unknown) {
   }
 }
 
+/**
+ * The Drive access token is kept on this device (localStorage) until it
+ * expires, so new tabs, a reopened browser or the home-screen app reuse it
+ * instead of asking Google again. Google limits it to one hour; it is bound to
+ * the signed-in account, cleared on sign-out, and never sent to Firestore.
+ */
+function store(): Storage | null {
+  try {
+    return typeof window !== "undefined" ? window.localStorage : null;
+  } catch {
+    return null; // Private mode or blocked storage: Google is simply asked again.
+  }
+}
+
 function saveDriveToken(token: string | null | undefined, uid: string) {
-  if (typeof window !== "undefined" && token) {
-    sessionStorage.setItem(DRIVE_TOKEN_KEY, token);
-    sessionStorage.setItem(DRIVE_TOKEN_TIME_KEY, String(Date.now()));
-    sessionStorage.setItem(DRIVE_TOKEN_UID_KEY, uid);
+  const s = store();
+  if (!s || !token) return;
+  try {
+    s.setItem(DRIVE_TOKEN_KEY, token);
+    s.setItem(DRIVE_TOKEN_TIME_KEY, String(Date.now()));
+    s.setItem(DRIVE_TOKEN_UID_KEY, uid);
+  } catch {
+    // Storage full or blocked: the token still works for this action.
   }
 }
 
 export function clearStoredDriveToken() {
-  if (typeof window !== "undefined") {
-    sessionStorage.removeItem(DRIVE_TOKEN_KEY);
-    sessionStorage.removeItem(DRIVE_TOKEN_TIME_KEY);
-    sessionStorage.removeItem(DRIVE_TOKEN_UID_KEY);
+  const s = store();
+  try {
+    s?.removeItem(DRIVE_TOKEN_KEY);
+    s?.removeItem(DRIVE_TOKEN_TIME_KEY);
+    s?.removeItem(DRIVE_TOKEN_UID_KEY);
+    // Older versions kept the token per tab.
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(DRIVE_TOKEN_KEY);
+      window.sessionStorage.removeItem(DRIVE_TOKEN_TIME_KEY);
+      window.sessionStorage.removeItem(DRIVE_TOKEN_UID_KEY);
+    }
+  } catch {
+    // Nothing stored.
   }
 }
 
 export function getStoredDriveToken() {
-  if (typeof window === "undefined") return null;
+  const s = store();
+  if (!s) return null;
 
-  const token = sessionStorage.getItem(DRIVE_TOKEN_KEY);
+  let token: string | null;
+  let owner: string | null;
+  let savedAt: number;
+  try {
+    token = s.getItem(DRIVE_TOKEN_KEY);
+    owner = s.getItem(DRIVE_TOKEN_UID_KEY);
+    savedAt = Number(s.getItem(DRIVE_TOKEN_TIME_KEY));
+  } catch {
+    return null;
+  }
   if (!token) return null;
 
   // A token belongs to the account that obtained it; never reuse it for another session.
   const currentUid = firebaseConfigured ? requireAuth().currentUser?.uid : undefined;
   if (!currentUid) return null; // Session not restored yet: keep the token, do not use it.
-  const owner = sessionStorage.getItem(DRIVE_TOKEN_UID_KEY);
-  const savedAt = Number(sessionStorage.getItem(DRIVE_TOKEN_TIME_KEY));
   if (
     owner !== currentUid ||
     !Number.isFinite(savedAt) ||
