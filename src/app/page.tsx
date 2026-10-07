@@ -15,6 +15,7 @@ import {
   PageHero,
   SectionHead,
   StatusTag,
+  evidenceCountLabel,
 } from "@/components/athari-ui/Ui";
 import { firebaseConfigured, requireAuth } from "@/lib/firebase";
 import { listUserEvidence } from "@/lib/firestore";
@@ -110,7 +111,7 @@ export default function HomePage() {
     <AthShell title="ملف الأداء المهني" subtitle="ملخص الشواهد وتغطية عناصر التقييم.">
       <PageHero
         title="تغطية عناصر التقييم"
-        sub={loading ? "…" : `${approved.length} ${approved.length === 1 ? "شاهد معتمد" : "شواهد معتمدة"} · ${covered.size} من ${totalElements} عناصر مغطاة`}
+        sub={loading ? "…" : `${evidenceCountLabel(approved.length)} · ${covered.size} من ${totalElements} عناصر مغطاة`}
         side={<CoverageRing percent={coverage} loading={loading} />}
         actions={
           <>

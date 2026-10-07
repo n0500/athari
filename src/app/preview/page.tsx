@@ -14,6 +14,7 @@ import {
   PortfolioHero,
   SectionHead,
   StatStrip,
+  evidenceCountLabel,
 } from "@/components/athari-ui/Ui";
 import { ProfessionalIdentityCard } from "@/components/ProfessionalIdentityCard";
 import { requireAuth } from "@/lib/firebase";
@@ -168,7 +169,7 @@ export default function PreviewPage() {
           <SectionHead
             icon={<Glyph name="doc" className="ath-green-ico" />}
             title="الشواهد المعتمدة"
-            sub={loading ? "جاري التحميل…" : items.length ? `${items.length} ${items.length === 1 ? "شاهد معتمد" : "شواهد معتمدة"}` : "لا توجد شواهد معتمدة بعد."}
+            sub={loading ? "جاري التحميل…" : items.length ? evidenceCountLabel(items.length) : "لا توجد شواهد معتمدة بعد."}
           />
         </div>
         {tiles.length ? <EvidenceTiles items={tiles} /> : null}
@@ -192,7 +193,7 @@ export default function PreviewPage() {
               <h2>
                 {index + 1}. {element.officialName}
                 <span className={evidence.length ? "ok" : "no"}>
-                  {evidence.length ? `${evidence.length} ${evidence.length === 1 ? "شاهد معتمد" : evidence.length === 2 ? "شاهدان معتمدان" : "شواهد معتمدة"}` : "غير مغطى"}
+                  {evidence.length ? evidenceCountLabel(evidence.length) : "غير مغطى"}
                 </span>
               </h2>
               {requirements.length ? (

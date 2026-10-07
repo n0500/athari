@@ -14,6 +14,7 @@ import {
   PortfolioHero,
   SectionHead,
   StatStrip,
+  evidenceCountLabel,
 } from "@/components/athari-ui/Ui";
 import { Scene } from "@/components/athari-ui/Art";
 import { Icon } from "@/components/Icon";
@@ -331,7 +332,7 @@ export default function PortfolioPage() {
       <SectionHead
         icon={<Glyph name="doc" className="ath-green-ico" />}
         title="الشواهد المعتمدة"
-        sub={loading ? "جاري التحميل…" : items.length ? `${items.length} ${items.length === 1 ? "شاهد معتمد" : "شواهد معتمدة"}` : "لا توجد شواهد معتمدة بعد."}
+        sub={loading ? "جاري التحميل…" : items.length ? evidenceCountLabel(items.length) : "لا توجد شواهد معتمدة بعد."}
         side={<Link className="ath-link-btn" href="/evidence">عرض جميع الشواهد <Glyph name="chevLeft" size={14} /></Link>}
       />
       {tiles.length ? (

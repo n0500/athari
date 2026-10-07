@@ -12,10 +12,12 @@ import {
   PortfolioHero,
   SectionHead,
   StatStrip,
+  evidenceCountLabel,
 } from "@/components/athari-ui/Ui";
 import { ProfessionalIdentityCard } from "@/components/ProfessionalIdentityCard";
 import { EvidenceReport } from "@/components/EvidenceReport";
 import { ShareEvidenceCard } from "@/components/ShareEvidenceCard";
+import { BackToTop } from "@/components/BackToTop";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import { ELEMENT_GUIDANCE } from "@/data/element-guidance";
 import { requirementsForElement } from "@/data/mandatory-requirements";
@@ -196,6 +198,7 @@ export default function PublicSharePage() {
         }}
         onOpenReport={() => setReport(item)}
         onOpenAttachment={(index) => openSpecificAttachment(item, index)}
+        ownerName={share?.professionalProfile?.fullName || share?.ownerDisplayName || ""}
       />
     );
   }
@@ -313,7 +316,7 @@ export default function PublicSharePage() {
               <SectionHead
                 icon={<Glyph name="doc" className="ath-green-ico" />}
                 title="الشواهد المعتمدة"
-                sub={`${allEvidence.length} ${allEvidence.length === 1 ? "شاهد معتمد" : "شواهد معتمدة"}`}
+                sub={evidenceCountLabel(allEvidence.length)}
               />
             </div>
             <div className="sec-list">{allEvidence.map((item) => cardFor(item))}</div>
@@ -322,6 +325,8 @@ export default function PublicSharePage() {
           </>
         )}
       </AthShell>
+
+      {report || viewer ? null : <BackToTop />}
 
       {report ? (
         <EvidenceReport

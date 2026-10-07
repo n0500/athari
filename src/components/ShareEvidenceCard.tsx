@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { Glyph, filesLabel } from "@/components/athari-ui/Ui";
 import { lookFor } from "@/components/athari-ui/Art";
 import { excellenceIndicatorsFor } from "@/lib/excellenceIndicators";
+import { attachmentKind, attachmentTitle } from "@/lib/attachmentDisplay";
 import "./share-evidence-card.css";
 
 /** Indicators shown before «عرض جميع المؤشرات». */
@@ -19,7 +20,7 @@ export type ShareEvidenceCardItem = {
   highlight?: string;
   elementId?: string;
   elementName?: string;
-  attachments: Array<{ driveFileId?: string }>;
+  attachments: Array<{ originalFileName?: string; mimeType?: string; driveFileId?: string }>;
 };
 
 /**
@@ -31,13 +32,18 @@ export function ShareEvidenceCard({
   item,
   onOpenReport,
   onOpenAttachment,
+  ownerName = "",
 }: {
   item: ShareEvidenceCardItem;
   onOpenReport: () => void;
   onOpenAttachment?: (index: number) => void;
+  /** Used only to drop the owner's name from attachment names. */
+  ownerName?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [filesOpen, setFilesOpen] = useState(false);
   const moreId = useId();
+  const filesId = useId();
   const indicators = excellenceIndicatorsFor(item);
   const preview = indicators.slice(0, PREVIEW_COUNT);
   const rest = indicators.slice(PREVIEW_COUNT);
@@ -84,19 +90,44 @@ export function ShareEvidenceCard({
       ) : null}
 
       <footer className="sec-files">
-        <span className="sec-count"><Glyph name="docOutline" size={15} />{filesLabel(files)}</span>
-        {files > 1 && onOpenAttachment ? (
-          <span className="sec-file-links no-print">
-            {item.attachments.map((attachment, index) =>
-              attachment.driveFileId ? (
-                <button type="button" key={index} onClick={() => onOpenAttachment(index)}>الملف {index + 1}</button>
-              ) : null
-            )}
-          </span>
+        <div className="sec-files-bar">
+          {files && onOpenAttachment ? (
+            <button
+              type="button"
+              className="sec-files-toggle no-print"
+              aria-expanded={filesOpen}
+              aria-controls={filesId}
+              onClick={() => setFilesOpen((value) => !value)}
+            >
+              <Glyph name="docOutline" size={16} />المرفقات · {files} {filesOpen ? "▴" : "▾"}
+            </button>
+          ) : (
+            <span className="sec-count"><Glyph name="docOutline" size={15} />{filesLabel(files)}</span>
+          )}
+          <button type="button" className="sec-view no-print" onClick={onOpenReport}>
+            <Glyph name="eye" size={16} />عرض الشاهد
+          </button>
+        </div>
+        {files && onOpenAttachment ? (
+          <ol id={filesId} className="sec-files-list no-print" hidden={!filesOpen}>
+            {item.attachments.map((attachment, index) => {
+              const name = attachment.originalFileName ?? "";
+              const kind = attachmentKind(attachment.mimeType ?? "", name);
+              const title = attachmentTitle(name, ownerName, index);
+              return (
+                <li key={index}>
+                  <span className={`sec-kind ${kind.tone}`}>{kind.label}</span>
+                  <span className="sec-file-name" title={name}>{title}</span>
+                  {attachment.driveFileId ? (
+                    <button type="button" onClick={() => onOpenAttachment(index)} aria-label={`عرض ${title}`}>
+                      <Glyph name="eye" size={15} />عرض
+                    </button>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
         ) : null}
-        <button type="button" className="sec-view no-print" onClick={onOpenReport}>
-          <Glyph name="eye" size={16} />عرض الشاهد
-        </button>
       </footer>
     </article>
   );

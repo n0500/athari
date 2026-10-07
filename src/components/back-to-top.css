@@ -1,0 +1,23 @@
+.back-to-top {
+  position: fixed;
+  z-index: 40;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  inset-inline-end: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 78, 89, .25);
+  background: #0f4e59;
+  color: #fff;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 800;
+  box-shadow: 0 6px 20px rgba(8, 24, 45, .22);
+  cursor: pointer;
+}
+.back-to-top-icon { transform: rotate(90deg); }
+.back-to-top:focus-visible { outline: 3px solid #7ff5e1; outline-offset: 2px; }
+@media print { .back-to-top { display: none; } }
