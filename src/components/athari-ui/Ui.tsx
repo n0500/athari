@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { AuthGate } from "@/components/AuthGate";
 import { ElementArt, EvidenceThumb, HeroArt, HeroWave, lookFor } from "./Art";
@@ -208,6 +208,28 @@ export function CoverageRing({ percent, loading }: { percent: number; loading?: 
   );
 }
 
+/** Counts up to `value` once on screen. The final number is always in the markup; motion is skipped when the device asks for less. */
+function CountUp({ value }: { value: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node || typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || value < 2) return;
+    let frame = 0;
+    const started = performance.now();
+    const duration = 1100;
+    node.textContent = "0";
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - started) / duration);
+      node.textContent = String(Math.round(value * (1 - Math.pow(1 - t, 3))));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(frame); node.textContent = String(value); };
+  }, [value]);
+  return <span ref={ref}>{value}</span>;
+}
+
 export function PortfolioHero({
   year, name, evidenceCount, covered, total, loading, browse, print, browseLabel = "استعراض الشواهد", extra,
   showCoverage = true,
@@ -229,8 +251,8 @@ export function PortfolioHero({
         {showCoverage ? <CoverageRing percent={percent} loading={loading} /> : null}
         {!showCoverage && !loading ? (
           <div className="ath-hero-figs">
-            <div className="fig"><b>{evidenceCount}</b><span>{evidenceCount === 1 ? "شاهد معتمد" : evidenceCount === 2 ? "شاهدان معتمدان" : evidenceCount <= 10 ? "شواهد معتمدة" : "شاهدًا معتمدًا"}</span></div>
-            <div className="fig"><b>{covered}</b><span>{covered === 1 ? "عنصر موثق" : covered === 2 ? "عنصران موثقان" : covered <= 10 ? "عناصر موثقة" : "عنصرًا موثقًا"}</span></div>
+            <div className="fig"><b><CountUp value={evidenceCount} /></b><span>{evidenceCount === 1 ? "شاهد معتمد" : evidenceCount === 2 ? "شاهدان معتمدان" : evidenceCount <= 10 ? "شواهد معتمدة" : "شاهدًا معتمدًا"}</span></div>
+            <div className="fig"><b><CountUp value={covered} /></b><span>{covered === 1 ? "عنصر موثق" : covered === 2 ? "عنصران موثقان" : covered <= 10 ? "عناصر موثقة" : "عنصرًا موثقًا"}</span></div>
           </div>
         ) : null}
       </div>
