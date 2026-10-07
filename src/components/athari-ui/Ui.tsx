@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { AuthGate } from "@/components/AuthGate";
 import { ElementArt, EvidenceThumb, HeroArt, HeroWave, lookFor } from "./Art";
@@ -206,28 +206,6 @@ export function CoverageRing({ percent, loading }: { percent: number; loading?: 
       <div className="ath-ring-v"><b>{loading ? "…" : <><CountUp value={percent} />%</>}</b><span>تغطية الإطار</span></div>
     </div>
   );
-}
-
-/** Counts up to `value` once on screen. The final number is always in the markup; motion is skipped when the device asks for less. */
-function CountUp({ value }: { value: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    const node = ref.current;
-    if (!node || typeof window === "undefined") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || value < 2) return;
-    let frame = 0;
-    const started = performance.now();
-    const duration = 1100;
-    node.textContent = "0";
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - started) / duration);
-      node.textContent = String(Math.round(value * (1 - Math.pow(1 - t, 3))));
-      if (t < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(frame); node.textContent = String(value); };
-  }, [value]);
-  return <span ref={ref}>{value}</span>;
 }
 
 export function PortfolioHero({
