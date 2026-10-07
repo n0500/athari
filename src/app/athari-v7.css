@@ -482,3 +482,19 @@ button.el-excel-proof:hover { background: #fbe6b0; }
 @media (min-width: 1280px) {
   .ath-frame.is-wide { max-width: 1200px; }
 }
+
+/* Evaluation element cards stand out from the page: white card, clear border
+   and shadow, and a colour bar on the reading side in the element's tone. */
+.ath .ath-grid .ath-el {
+  background: #fff;
+  border: 1px solid rgba(36, 72, 120, .2);
+  border-inline-start: 5px solid var(--el-accent, #1d5fd6);
+  box-shadow: 0 6px 18px -8px rgba(15, 45, 90, .35), 0 1px 2px rgba(15, 45, 90, .08);
+}
+.ath .ath-grid .ath-el.tone-mint { --el-accent: #178a55; }
+.ath .ath-grid .ath-el.tone-sky { --el-accent: #1d5fd6; }
+.ath .ath-grid .ath-el.tone-lav { --el-accent: #5a4fc4; }
+.ath .ath-grid .ath-el.tone-pink { --el-accent: #d8475c; }
+.ath .ath-grid .ath-el.tone-cream { --el-accent: #c68a1e; }
+.ath .ath-grid .ath-el:hover { box-shadow: 0 10px 24px -10px rgba(15, 45, 90, .45), 0 1px 2px rgba(15, 45, 90, .08); }
+@media print { .ath .ath-grid .ath-el { box-shadow: none; } }
