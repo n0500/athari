@@ -596,3 +596,6 @@ button.el-excel-proof:hover { background: #fbe6b0; }
 }
 .ath-frame.is-wide .idc-kicker { font-size: 18px; font-weight: 800; opacity: 1; display: block; margin-bottom: 8px; }
 @media (min-width: 900px) { .ath-frame.is-wide .idc-kicker { font-size: 26px; margin-bottom: 12px; } }
+
+/* Jump targets in the principal's view stop just below the top of the screen. */
+#evaluation-elements, #approved-evidence { scroll-margin-top: 12px; }

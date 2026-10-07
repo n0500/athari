@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Scene } from "@/components/athari-ui/Art";
 import {
   AthShell,
@@ -64,6 +64,14 @@ export default function PublicSharePage() {
   const [error, setError] = useState("");
   const [viewer, setViewer] = useState<ViewerAttachment | null>(null);
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
+  // Coming back from an element returns to the evaluation elements, not the top of the page.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !activeElementId) {
+      requestAnimationFrame(() => document.getElementById("evaluation-elements")?.scrollIntoView({ block: "start" }));
+    }
+    wasOpen.current = Boolean(activeElementId);
+  }, [activeElementId]);
   const [report, setReport] = useState<ShareEvidence | null>(null);
 
   useEffect(() => {
@@ -284,7 +292,8 @@ export default function PublicSharePage() {
               evidenceCount={share.evidence.length}
               covered={covered}
               total={total}
-              browse={{ onClick: () => document.getElementById("approved-evidence")?.scrollIntoView({ behavior: "smooth" }) }}
+              browse={{ onClick: () => document.getElementById("evaluation-elements")?.scrollIntoView({ behavior: "smooth" }) }}
+              browseLabel="استعراض عناصر التقييم"
               showCoverage={false}
             />
 
@@ -307,7 +316,9 @@ export default function PublicSharePage() {
               showTotal={false}
             />
 
-            <SectionHead icon={<Glyph name="bars" />} title="عناصر التقييم الموثقة" side={<CountChip total={covered} />} />
+            <div id="evaluation-elements">
+              <SectionHead icon={<Glyph name="bars" />} title="عناصر التقييم" side={<CountChip total={covered} />} />
+            </div>
             <ElementGrid
               elements={elementSummaries}
               tapFor={(id) => ({ onClick: () => { setActiveElementId(id); window.scrollTo({ top: 0 }); } })}
