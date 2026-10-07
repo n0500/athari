@@ -219,7 +219,8 @@ export function PortfolioHero({
 }) {
   const percent = total ? Math.round((covered / total) * 100) : 0;
   return (
-    <section className="ath-hero">
+    <section className={`ath-hero ${showCoverage ? "" : "has-cutout"}`}>
+      {!showCoverage ? <img className="ath-hero-cutout" src="/athari-assets/hero-cutout.webp" alt="" aria-hidden="true" /> : null}
       <div className="ath-hero-row">
         <div className="ath-hero-text">
           <span className="ath-pill-out"><Glyph name="cal" size={16} />العام الدراسي {year}</span>

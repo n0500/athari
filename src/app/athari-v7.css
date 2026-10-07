@@ -553,34 +553,34 @@ button.el-excel-proof:hover { background: #fbe6b0; }
 }
 @media print { .ath .sec-card { box-shadow: none; } }
 
-/* ---------- Header on wide screens: balanced hero and identity banner ---------- */
-.ath-hero-figs { display: none; }
+/* ---------- Header on wide screens: hero with cut-out portrait (as in the developed theme) ---------- */
+.ath-hero-figs, .ath-hero-cutout { display: none; }
 @media (min-width: 900px) {
-  .ath-frame.is-wide .ath-hero { padding: 30px 36px; }
+  .ath-frame.is-wide .ath-hero { padding: 30px 36px 30px 380px; min-height: 280px; display: flex; flex-direction: column; justify-content: center; }
+  .ath-frame.is-wide .ath-hero-cutout {
+    display: block; position: absolute; left: 12px; bottom: 0; width: 340px; height: auto;
+    pointer-events: none; user-select: none; z-index: 0;
+  }
   .ath-frame.is-wide .ath-hero::before {
-    content: ""; position: absolute; inset-inline-end: -60px; top: -80px; width: 280px; height: 280px;
-    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.14), rgba(255,255,255,0) 70%);
+    content: ""; position: absolute; left: -40px; bottom: -80px; width: 420px; height: 420px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.16), rgba(255,255,255,0) 70%);
     pointer-events: none;
   }
-  .ath-frame.is-wide .ath-hero-row { justify-content: space-between; gap: 32px; }
-  .ath-frame.is-wide .ath-hero-text { flex: 0 1 560px; }
+  .ath-frame.is-wide .ath-hero-row { flex-direction: column; align-items: flex-start; gap: 18px; }
+  .ath-frame.is-wide .ath-hero-text { flex: none; }
   .ath-frame.is-wide .ath-hero h1 { font-size: 34px; line-height: 1.4; }
   .ath-frame.is-wide .ath-hero-meta { display: none; }
   .ath-frame.is-wide .ath-hero-btns { max-width: 300px; margin-top: 18px; }
-  .ath-frame.is-wide .ath-hero-figs { display: flex; gap: 14px; position: relative; z-index: 1; margin-inline-start: auto; }
+  .ath-frame.is-wide .ath-hero-figs { display: flex; gap: 12px; position: relative; z-index: 1; }
   .ath-frame.is-wide .ath-hero-figs .fig {
-    min-width: 150px; padding: 18px 20px; border-radius: 20px; text-align: center;
-    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.28);
-    display: flex; flex-direction: column; gap: 4px;
+    min-width: 130px; padding: 12px 16px; border-radius: 16px;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.26);
+    display: flex; flex-direction: column; gap: 2px;
   }
-  .ath-frame.is-wide .ath-hero-figs b { font-size: 44px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; }
-  .ath-frame.is-wide .ath-hero-figs span { font-size: 15px; font-weight: 700; opacity: .92; }
+  .ath-frame.is-wide .ath-hero-figs b { font-size: 32px; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .ath-frame.is-wide .ath-hero-figs span { font-size: 14px; font-weight: 700; opacity: .92; }
 
   .ath-frame.is-wide .idc-head { padding: 26px 32px; gap: 20px; position: relative; overflow: hidden; }
-  .ath-frame.is-wide .idc-head::after {
-    content: ""; position: absolute; inset-inline-end: -50px; top: -70px; width: 220px; height: 220px;
-    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.12), rgba(255,255,255,0) 70%);
-  }
   .ath-frame.is-wide .idc-avatar { width: 76px; height: 76px; border-radius: 22px; font-size: 34px; border: 1px solid rgba(255,255,255,.3); }
   .ath-frame.is-wide .idc-kicker { font-size: 14px; }
   .ath-frame.is-wide .idc-id h2 { font-size: 28px; margin: 4px 0 10px; }
