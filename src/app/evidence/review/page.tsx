@@ -517,14 +517,28 @@ function ReviewInner() {
         return;
       }
 
-      const token = await ensureDriveAccessToken();
       const originals = attachmentsFor(item);
       const movable = originals.filter(
         (attachment) => attachment.sourceKind !== "drive_link" && attachment.driveFileId
       );
 
+      // Re-approving an approved evidence whose primary element is unchanged and
+      // whose files already sit in that element's folder only edits text:
+      // Google Drive is not needed, so no Google window opens.
+      const previousPrimary =
+        item.approvedContent?.classifications?.find((entry) => entry.isPrimary)?.elementId ??
+        item.approvedContent?.elementId;
+      const filesInPlace =
+        Boolean(item.driveParentFolderId) &&
+        movable.every((attachment) => attachment.driveParentFolderId === item.driveParentFolderId);
+      const textOnly =
+        item.status === "approved" && previousPrimary === primary.elementId && (!movable.length || filesInPlace);
+
+      // Must stay the first await of the tap, so the browser allows the Google window.
+      const token = textOnly ? getStoredDriveToken() : await ensureDriveAccessToken();
+
       let movedParentId: string | undefined;
-      if (movable.length) {
+      if (!textOnly && token && movable.length) {
         const { element } = await ensureAthariElementFolder(
           token,
           item.academicYear,
@@ -570,6 +584,8 @@ function ReviewInner() {
       stage = "backup";
 
       try {
+        // Without current Drive access the backup is refreshed on the next approval that has it.
+        if (!token) throw new Error("BACKUP_SKIPPED");
         const all = await listUserEvidence(user.uid);
         await upsertAthariBackup(token, {
           format: "athari-backup-v4",
