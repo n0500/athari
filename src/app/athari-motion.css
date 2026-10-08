@@ -1,53 +1,287 @@
-/* Principal's view only (.ath-frame.is-wide): calm entrance and scroll motion.
-   CSS-only, no layout shift, off for reduced-motion and print. Content is always
-   in the markup, so browsers without scroll-driven animations simply show it. */
+/* Athari Motion — subtle premium animation layer. Loaded last. */
 
-@media screen and (prefers-reduced-motion: no-preference) {
-  :root { --ath-ease: cubic-bezier(.22,.78,.24,1); }
-
-  /* Hero: rises in, text and number tiles follow one after another. */
-  .ath-frame.is-wide .ath-hero { animation: ath-hero-in .7s var(--ath-ease) both; }
-  .ath-frame.is-wide .ath-hero .ath-pill-out { animation: ath-copy-up .5s var(--ath-ease) .15s both; }
-  .ath-frame.is-wide .ath-hero h1 { animation: ath-copy-up .55s var(--ath-ease) .25s both; }
-  .ath-frame.is-wide .ath-hero-figs .fig:nth-child(1) { animation: ath-copy-up .55s var(--ath-ease) .4s both; }
-  .ath-frame.is-wide .ath-hero-figs .fig:nth-child(2) { animation: ath-copy-up .55s var(--ath-ease) .5s both; }
-  .ath-frame.is-wide .ath-hero-btns { animation: ath-copy-up .55s var(--ath-ease) .6s both; }
-  .ath-frame.is-wide .ath-hero-cutout {
-    animation: ath-cutout-in .9s var(--ath-ease) .1s both, ath-float 7s ease-in-out 1.2s infinite alternate;
-  }
-
-  /* Page header and identity card fade in first. */
-  .ath-frame.is-wide .ath-top, .ath-frame.is-wide header { animation: ath-fade .5s ease both; }
-
-  /* Everything below rises into view as it is scrolled to. */
-  @supports (animation-timeline: view()) {
-    .ath-frame.is-wide :is(.idc, .ath-stats, .ath-sec-head, .ath-grid .ath-el, .sec-card) {
-      animation: ath-rise linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 40%;
-    }
-  }
-
-  /* Gentle feedback on hover and press. */
-  .ath-frame.is-wide .ath-el, .ath-frame.is-wide .sec-card { transition: transform .22s var(--ath-ease), box-shadow .22s var(--ath-ease); }
-  @media (hover: hover) {
-    .ath-frame.is-wide .ath-el:hover, .ath-frame.is-wide .sec-card:hover { transform: translateY(-3px); }
-  }
-  .ath-frame.is-wide .ath-btn, .ath-frame.is-wide .sec-ind-toggle, .ath-frame.is-wide .sec-files-toggle, .ath-frame.is-wide .sec-view { transition: transform .15s ease, box-shadow .2s ease, background-color .2s ease; }
-  .ath-frame.is-wide .ath-btn:active, .ath-frame.is-wide .sec-ind-toggle:active, .ath-frame.is-wide .sec-files-toggle:active, .ath-frame.is-wide .sec-view:active { transform: scale(.97); }
-
-  /* Switching to or between elements fades the new view in. */
-  .ath-frame.is-wide .ath-view-in { animation: ath-view .4s var(--ath-ease) both; }
-
-  /* Opening the indicators and attachments eases in instead of snapping. */
-  .ath-frame.is-wide .sec-ind-more:not([hidden]), .ath-frame.is-wide .sec-files-list:not([hidden]) { animation: ath-open .3s var(--ath-ease) both; }
+:root{
+  --athari-ease: cubic-bezier(.22,.78,.24,1);
+  --athari-ease-soft: cubic-bezier(.2,.7,.2,1);
 }
 
-@keyframes ath-hero-in { from { opacity: 0; translate: 0 14px; scale: .992; } to { opacity: 1; translate: 0 0; scale: 1; } }
-@keyframes ath-copy-up { from { opacity: 0; translate: 0 10px; } to { opacity: 1; translate: 0 0; } }
-@keyframes ath-fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes ath-cutout-in { from { opacity: 0; translate: -24px 12px; scale: .96; } to { opacity: 1; translate: 0 0; scale: 1; } }
-@keyframes ath-float { from { translate: 0 0; } to { translate: 0 -7px; } }
-@keyframes ath-rise { from { opacity: 0; translate: 0 26px; scale: .985; } to { opacity: 1; translate: 0 0; scale: 1; } }
-@keyframes ath-open { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0 0; } }
-@keyframes ath-view { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }
+/* Page entry */
+.athari-motion-enabled .athari-page-enter{
+  animation: athari-page-in 360ms var(--athari-ease) both;
+}
+
+@keyframes athari-page-in{
+  from{opacity:.01;transform:translateY(7px)}
+  to{opacity:1;transform:none}
+}
+
+/* Hero entrance */
+.athari-motion-enabled .athari-hero-motion{
+  opacity:0;
+  transform:translateY(12px) scale(.992);
+  transition:
+    opacity 520ms var(--athari-ease) var(--athari-delay,0ms),
+    transform 520ms var(--athari-ease) var(--athari-delay,0ms),
+    box-shadow 520ms var(--athari-ease) var(--athari-delay,0ms);
+}
+
+.athari-motion-enabled .athari-hero-motion.is-visible{
+  opacity:1;
+  transform:none;
+}
+
+.athari-motion-enabled .athari-hero-motion .exact-hero-art,
+.athari-motion-enabled .athari-hero-motion .share-v5-hero-art,
+.athari-motion-enabled .athari-hero-motion > img{
+  transform:scale(1.025);
+  opacity:.88;
+  transition:
+    transform 900ms var(--athari-ease) 90ms,
+    opacity 650ms ease 90ms;
+}
+
+.athari-motion-enabled .athari-hero-motion.is-visible .exact-hero-art,
+.athari-motion-enabled .athari-hero-motion.is-visible .share-v5-hero-art,
+.athari-motion-enabled .athari-hero-motion.is-visible > img{
+  transform:scale(1);
+  opacity:1;
+}
+
+/* Hero text staggers in softly */
+.athari-motion-enabled .athari-hero-motion .exact-year,
+.athari-motion-enabled .athari-hero-motion .share-v5-year,
+.athari-motion-enabled .athari-hero-motion .exact-kicker,
+.athari-motion-enabled .athari-hero-motion .share-v5-kicker,
+.athari-motion-enabled .athari-hero-motion h1,
+.athari-motion-enabled .athari-hero-motion .exact-hero-copy > p,
+.athari-motion-enabled .athari-hero-motion .share-v5-hero-copy > p,
+.athari-motion-enabled .athari-hero-motion .exact-hero-actions,
+.athari-motion-enabled .athari-hero-motion .share-v5-hero-buttons,
+.athari-motion-enabled .athari-hero-motion .exact-element-meta,
+.athari-motion-enabled .athari-hero-motion .share-v5-detail-chips{
+  opacity:0;
+  transform:translateY(8px);
+}
+
+.athari-motion-enabled .athari-hero-motion.is-visible .exact-year,
+.athari-motion-enabled .athari-hero-motion.is-visible .share-v5-year{
+  animation:athari-copy-up 420ms var(--athari-ease) 100ms both;
+}
+.athari-motion-enabled .athari-hero-motion.is-visible .exact-kicker,
+.athari-motion-enabled .athari-hero-motion.is-visible .share-v5-kicker{
+  animation:athari-copy-up 420ms var(--athari-ease) 150ms both;
+}
+.athari-motion-enabled .athari-hero-motion.is-visible h1{
+  animation:athari-copy-up 460ms var(--athari-ease) 205ms both;
+}
+.athari-motion-enabled .athari-hero-motion.is-visible .exact-hero-copy > p,
+.athari-motion-enabled .athari-hero-motion.is-visible .share-v5-hero-copy > p{
+  animation:athari-copy-up 440ms var(--athari-ease) 260ms both;
+}
+.athari-motion-enabled .athari-hero-motion.is-visible .exact-element-meta,
+.athari-motion-enabled .athari-hero-motion.is-visible .share-v5-detail-chips{
+  animation:athari-copy-up 440ms var(--athari-ease) 300ms both;
+}
+.athari-motion-enabled .athari-hero-motion.is-visible .exact-hero-actions,
+.athari-motion-enabled .athari-hero-motion.is-visible .share-v5-hero-buttons{
+  animation:athari-copy-up 440ms var(--athari-ease) 330ms both;
+}
+
+@keyframes athari-copy-up{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:none}
+}
+
+/* Circular progress gets a subtle emphasis once */
+.athari-motion-enabled .athari-hero-motion .exact-progress,
+.athari-motion-enabled .athari-hero-motion .share-v5-ring{
+  transform:scale(.92);
+  opacity:0;
+}
+.athari-motion-enabled .athari-hero-motion.is-visible .exact-progress,
+.athari-motion-enabled .athari-hero-motion.is-visible .share-v5-ring{
+  animation:athari-progress-in 620ms var(--athari-ease) 300ms both;
+}
+@keyframes athari-progress-in{
+  0%{opacity:0;transform:scale(.9)}
+  70%{opacity:1;transform:scale(1.025)}
+  100%{opacity:1;transform:scale(1)}
+}
+
+/* Scroll reveal */
+.athari-motion-enabled .athari-reveal{
+  opacity:0;
+  transform:translateY(13px);
+  transition:
+    opacity 420ms var(--athari-ease) var(--athari-stagger,0ms),
+    transform 440ms var(--athari-ease) var(--athari-stagger,0ms),
+    box-shadow 280ms ease,
+    border-color 280ms ease;
+  will-change:opacity,transform;
+}
+.athari-motion-enabled .athari-reveal.is-visible{
+  opacity:1;
+  transform:none;
+  will-change:auto;
+}
+
+/* Approved check pops in only once with the card */
+.athari-motion-enabled .exact-element-card.athari-reveal .exact-element-status,
+.athari-motion-enabled .share-v5-element-card.athari-reveal .share-v5-element-status{
+  transform:scale(.82);
+  opacity:.65;
+}
+.athari-motion-enabled .exact-element-card.athari-reveal.is-visible .exact-element-status,
+.athari-motion-enabled .share-v5-element-card.athari-reveal.is-visible .share-v5-element-status{
+  animation:athari-check-in 360ms var(--athari-ease) calc(var(--athari-stagger,0ms) + 180ms) both;
+}
+@keyframes athari-check-in{
+  0%{opacity:.2;transform:scale(.72)}
+  70%{opacity:1;transform:scale(1.08)}
+  100%{opacity:1;transform:scale(1)}
+}
+
+/* Cards feel tactile but formal */
+.exact-element-card,
+.share-v5-element-card,
+.exact-evidence-card,
+.share-v5-evidence-card,
+.exact-stat,
+.share-v5-summary-card,
+.exact-info-card,
+.share-v5-detail-card,
+.exact-detail-evidence,
+.share-v5-detail-evidence,
+.exact-preview-row{
+  transition:
+    transform 180ms var(--athari-ease-soft),
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+@media (hover:hover) and (pointer:fine){
+  .exact-element-card:hover,
+  .share-v5-element-card:hover,
+  .exact-evidence-card:hover,
+  .share-v5-evidence-card:hover,
+  .exact-stat:hover,
+  .share-v5-summary-card:hover{
+    transform:translateY(-3px);
+    box-shadow:0 18px 38px rgba(30,72,112,.11)!important;
+  }
+
+  .exact-detail-evidence:hover,
+  .share-v5-detail-evidence:hover,
+  .exact-preview-row:hover{
+    transform:translateY(-2px);
+  }
+}
+
+/* Buttons: short press feedback only */
+.exact-hero-actions a,
+.share-v5-primary-btn,
+.share-v5-secondary-btn,
+.exact-evidence-body > a,
+.share-v5-view-evidence,
+.exact-preview-actions a,
+.exact-preview-actions button,
+.exact-detail-copy footer a,
+.share-v5-detail-evidence-actions a,
+.share-v5-detail-evidence-actions button,
+.exact-share-primary,
+.exact-share-buttons button,
+.exact-share-buttons a,
+.nav-item{
+  transition:
+    transform 140ms ease,
+    filter 160ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.exact-hero-actions a:active,
+.share-v5-primary-btn:active,
+.share-v5-secondary-btn:active,
+.exact-evidence-body > a:active,
+.share-v5-view-evidence:active,
+.exact-preview-actions a:active,
+.exact-preview-actions button:active,
+.exact-detail-copy footer a:active,
+.share-v5-detail-evidence-actions a:active,
+.share-v5-detail-evidence-actions button:active,
+.exact-share-primary:active,
+.exact-share-buttons button:active,
+.exact-share-buttons a:active,
+.nav-item:active{
+  transform:scale(.975);
+  filter:saturate(.96) brightness(.98);
+}
+
+/* Share panel: smooth content appearance */
+.exact-share-manager[open] .exact-share-content{
+  animation:athari-share-open 300ms var(--athari-ease) both;
+}
+@keyframes athari-share-open{
+  from{opacity:0;transform:translateY(-5px)}
+  to{opacity:1;transform:none}
+}
+
+/* Toast / inline feedback */
+.flow-message{
+  animation:athari-toast-in 320ms var(--athari-ease) both;
+}
+@keyframes athari-toast-in{
+  from{opacity:0;transform:translateY(7px) scale(.99)}
+  to{opacity:1;transform:none}
+}
+
+/* Navigation active icon settles softly */
+.nav-item.is-active .nav-icon{
+  animation:athari-nav-active 320ms var(--athari-ease) both;
+}
+@keyframes athari-nav-active{
+  0%{transform:scale(.92)}
+  70%{transform:scale(1.05)}
+  100%{transform:scale(1)}
+}
+
+/* Tiny shimmer for loading copy, without hiding the UI */
+.athari-motion-enabled [class*="loading"],
+.athari-motion-enabled .setup-notice{
+  background-size:200% 100%;
+  animation:athari-soft-pulse 1.45s ease-in-out infinite;
+}
+@keyframes athari-soft-pulse{
+  0%,100%{opacity:.72}
+  50%{opacity:1}
+}
+
+/* Print must remain completely static. */
+@media print{
+  .athari-reveal,
+  .athari-hero-motion,
+  .athari-page-enter{
+    opacity:1!important;
+    transform:none!important;
+    animation:none!important;
+    transition:none!important;
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion:reduce){
+  *,
+  *::before,
+  *::after{
+    scroll-behavior:auto!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+    transition-delay:0ms!important;
+  }
+  .athari-reveal,
+  .athari-hero-motion{
+    opacity:1!important;
+    transform:none!important;
+  }
+}
