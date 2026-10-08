@@ -6,6 +6,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import {
   ActionTile,
   AthShell,
+  HeroFigs,
   CoverageRing,
   EvidenceThumb,
   EvidenceTiles,
@@ -108,11 +109,12 @@ export default function HomePage() {
   }
 
   return (
-    <AthShell title="ملف الأداء المهني" subtitle="ملخص الشواهد وتغطية عناصر التقييم.">
+    <AthShell wide title="ملف الأداء المهني" subtitle="ملخص الشواهد وتغطية عناصر التقييم.">
       <PageHero
         title="تغطية عناصر التقييم"
         sub={loading ? "…" : `${evidenceCountLabel(approved.length)} · ${covered.size} من ${totalElements} عناصر مغطاة`}
         side={<CoverageRing percent={coverage} loading={loading} />}
+        figs={loading ? undefined : <HeroFigs evidenceCount={approved.length} covered={covered.size} total={totalElements} percent={coverage} />}
         actions={
           <>
             <Link className="ath-btn primary" href="/evidence/new"><Glyph name="plus" />إضافة شاهد</Link>

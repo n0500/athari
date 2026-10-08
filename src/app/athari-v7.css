@@ -599,3 +599,11 @@ button.el-excel-proof:hover { background: #fbe6b0; }
 
 /* Jump targets in the principal's view stop just below the top of the screen. */
 #evaluation-elements, #approved-evidence { scroll-margin-top: 12px; }
+
+/* Teacher heroes with number tiles: the ring and the text summary are replaced by the tiles on wide screens. */
+.ath-hero-figs em { font-style: normal; font-size: .55em; font-weight: 700; opacity: .9; margin-inline-start: 4px; }
+@media (min-width: 900px) {
+  .ath-frame.is-wide .ath-hero:has(.ath-hero-figs) .ath-ring,
+  .ath-frame.is-wide .ath-hero:has(.ath-hero-figs) .ath-hero-sub { display: none; }
+  .ath-frame.is-wide .ath-hero-figs .fig { min-width: 120px; }
+}

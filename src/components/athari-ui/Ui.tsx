@@ -208,6 +208,21 @@ export function CoverageRing({ percent, loading }: { percent: number; loading?: 
   );
 }
 
+/** Number tiles beside the hero title on wide screens (hidden on phones). Counts only, never invented. */
+export function HeroFigs({ evidenceCount, covered, total, percent }: { evidenceCount: number; covered: number; total?: number; percent?: number }) {
+  const evidenceWord = evidenceCount === 1 ? "شاهد معتمد" : evidenceCount === 2 ? "شاهدان معتمدان" : evidenceCount <= 10 ? "شواهد معتمدة" : "شاهدًا معتمدًا";
+  const elementWord = total !== undefined
+    ? "عناصر مغطاة"
+    : covered === 1 ? "عنصر موثق" : covered === 2 ? "عنصران موثقان" : covered <= 10 ? "عناصر موثقة" : "عنصرًا موثقًا";
+  return (
+    <div className="ath-hero-figs">
+      <div className="fig"><b><CountUp value={evidenceCount} /></b><span>{evidenceWord}</span></div>
+      <div className="fig"><b><CountUp value={covered} />{total !== undefined ? <em> من {total}</em> : null}</b><span>{elementWord}</span></div>
+      {percent !== undefined ? <div className="fig"><b><CountUp value={percent} />%</b><span>تغطية الإطار</span></div> : null}
+    </div>
+  );
+}
+
 export function PortfolioHero({
   year, name, evidenceCount, covered, total, loading, browse, print, browseLabel = "استعراض الشواهد", extra,
   showCoverage = true,
@@ -219,20 +234,15 @@ export function PortfolioHero({
 }) {
   const percent = total ? Math.round((covered / total) * 100) : 0;
   return (
-    <section className={`ath-hero ${showCoverage ? "" : "has-cutout"}`}>
-      {!showCoverage ? <img className="ath-hero-cutout" src="/athari-assets/hero-cutout.webp" alt="" aria-hidden="true" /> : null}
+    <section className="ath-hero has-cutout">
+      <img className="ath-hero-cutout" src="/athari-assets/hero-cutout.webp" alt="" aria-hidden="true" />
       <div className="ath-hero-row">
         <div className="ath-hero-text">
           <span className="ath-pill-out"><Glyph name="cal" size={16} />العام الدراسي {year}</span>
           <h1>ملف الأداء المهني{name ? <><br />{name}</> : null}</h1>
         </div>
         {showCoverage ? <CoverageRing percent={percent} loading={loading} /> : null}
-        {!showCoverage && !loading ? (
-          <div className="ath-hero-figs">
-            <div className="fig"><b><CountUp value={evidenceCount} /></b><span>{evidenceCount === 1 ? "شاهد معتمد" : evidenceCount === 2 ? "شاهدان معتمدان" : evidenceCount <= 10 ? "شواهد معتمدة" : "شاهدًا معتمدًا"}</span></div>
-            <div className="fig"><b><CountUp value={covered} /></b><span>{covered === 1 ? "عنصر موثق" : covered === 2 ? "عنصران موثقان" : covered <= 10 ? "عناصر موثقة" : "عنصرًا موثقًا"}</span></div>
-          </div>
-        ) : null}
+        {!loading ? <HeroFigs evidenceCount={evidenceCount} covered={covered} total={showCoverage ? total : undefined} percent={showCoverage ? percent : undefined} /> : null}
       </div>
       <p className="ath-hero-meta">
         {loading
@@ -517,13 +527,16 @@ export function Notice({ tone = "info", children }: { tone?: "info" | "error"; c
 
 /** Teal hero used by home, evidence list and account screens. */
 export function PageHero({
-  eyebrow, title, sub, side, actions, art,
+  eyebrow, title, sub, side, actions, art, figs,
 }: {
   eyebrow?: ReactNode; title: ReactNode; sub?: ReactNode; side?: ReactNode; actions?: ReactNode;
   art?: "folders" | "magnify";
+  /** Number tiles for wide screens; also turns on the cut-out illustration. */
+  figs?: ReactNode;
 }) {
   return (
-    <section className="ath-hero">
+    <section className={`ath-hero ${figs ? "has-cutout" : ""}`}>
+      {figs ? <img className="ath-hero-cutout" src="/athari-assets/hero-cutout.webp" alt="" aria-hidden="true" /> : null}
       <div className="ath-hero-row">
         <div className="ath-hero-text">
           {eyebrow ? <span className="ath-pill-out">{eyebrow}</span> : null}
@@ -531,6 +544,7 @@ export function PageHero({
           {sub ? <p className="ath-hero-sub">{sub}</p> : null}
         </div>
         {side ?? (art ? <HeroArt kind={art} className="ath-hero-art" /> : null)}
+        {figs}
       </div>
       {actions ? <div className="ath-hero-btns no-print">{actions}</div> : null}
       <HeroWave />

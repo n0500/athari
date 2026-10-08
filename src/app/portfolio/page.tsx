@@ -237,7 +237,7 @@ export default function PortfolioPage() {
   const ownerName = professionalProfile?.fullName || user?.displayName?.trim() || "";
 
   return (
-    <AthShell title="ملف الأداء المهني" subtitle="عناصر التقييم والشواهد المرتبطة بها.">
+    <AthShell wide title="ملف الأداء المهني" subtitle="عناصر التقييم والشواهد المرتبطة بها.">
       {justAdded ? (
         <section className="ath-success ath-scene-card" role="status">
           <button type="button" className="x" onClick={() => setJustAdded(false)} aria-label="إغلاق"><span aria-hidden>×</span></button>
