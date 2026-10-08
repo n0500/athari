@@ -64,6 +64,7 @@ export default function PublicSharePage() {
   const [error, setError] = useState("");
   const [viewer, setViewer] = useState<ViewerAttachment | null>(null);
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   // Coming back from an element returns to the evaluation elements, not the top of the page.
   const wasOpen = useRef(false);
   useEffect(() => {
@@ -139,6 +140,15 @@ export default function PublicSharePage() {
   const activeGroup = activeElementId
     ? grouped.find((group) => group.element.id === activeElementId) ?? null
     : null;
+
+  const navGroups = grouped.filter((group) => group.evidence.length > 0);
+  const navIndex = activeGroup ? navGroups.findIndex((group) => group.element.id === activeGroup.element.id) : -1;
+  const prevGroup = navIndex > 0 ? navGroups[navIndex - 1] : null;
+  const nextGroup = navIndex >= 0 && navIndex < navGroups.length - 1 ? navGroups[navIndex + 1] : null;
+  function goToElement(id: string) {
+    setActiveElementId(id);
+    window.scrollTo({ top: 0 });
+  }
 
   function openSpecificAttachment(item: ShareEvidence, attachmentIndex: number) {
     const attachment = item.attachments[attachmentIndex];
@@ -231,7 +241,7 @@ export default function PublicSharePage() {
         back={activeGroup ? { onClick: () => setActiveElementId(null) } : undefined}
       >
         {activeGroup ? (
-          <>
+          <div className="ath-view-in" key={activeGroup.element.id}>
             <ElementDetail
               elementId={activeGroup.element.id}
               name={activeGroup.element.officialName}
@@ -283,7 +293,30 @@ export default function PublicSharePage() {
                 </div>
               </Panel>
             ) : null}
-          </>
+
+            {navIndex >= 0 ? (
+              <nav className="sec-nav no-print" aria-label="التنقل بين عناصر التقييم">
+                {prevGroup ? (
+                  <button type="button" className="sec-nav-btn prev" onClick={() => goToElement(prevGroup.element.id)}>
+                    <small>العنصر السابق</small>
+                    <strong>{prevGroup.element.officialName}</strong>
+                  </button>
+                ) : <span />}
+                <span className="sec-nav-pos">{navIndex + 1} من {navGroups.length}</span>
+                {nextGroup ? (
+                  <button type="button" className="sec-nav-btn next" onClick={() => goToElement(nextGroup.element.id)}>
+                    <small>العنصر التالي</small>
+                    <strong>{nextGroup.element.officialName}</strong>
+                  </button>
+                ) : (
+                  <button type="button" className="sec-nav-btn next" onClick={() => setActiveElementId(null)}>
+                    <small>انتهت العناصر</small>
+                    <strong>العودة إلى عناصر التقييم</strong>
+                  </button>
+                )}
+              </nav>
+            ) : null}
+          </div>
         ) : (
           <>
             <PortfolioHero
@@ -331,7 +364,12 @@ export default function PublicSharePage() {
                 sub={evidenceCountLabel(allEvidence.length)}
               />
             </div>
-            <div className="sec-list">{allEvidence.map((item) => cardFor(item))}</div>
+            <div className="sec-all no-print">
+              <button type="button" className="sec-all-toggle" aria-expanded={showAll} aria-controls="all-evidence-list" onClick={() => setShowAll((value) => !value)}>
+                {showAll ? "إخفاء جميع الشواهد ▴" : `عرض جميع الشواهد (${allEvidence.length}) ▾`}
+              </button>
+            </div>
+            <div id="all-evidence-list" className="sec-list" hidden={!showAll}>{allEvidence.map((item) => cardFor(item))}</div>
 
             <p className="ath-footnote">أثري · مشاركة ملف الأداء · للعرض فقط</p>
           </>

@@ -36,6 +36,9 @@
   .ath-frame.is-wide .ath-btn, .ath-frame.is-wide .sec-ind-toggle, .ath-frame.is-wide .sec-files-toggle, .ath-frame.is-wide .sec-view { transition: transform .15s ease, box-shadow .2s ease, background-color .2s ease; }
   .ath-frame.is-wide .ath-btn:active, .ath-frame.is-wide .sec-ind-toggle:active, .ath-frame.is-wide .sec-files-toggle:active, .ath-frame.is-wide .sec-view:active { transform: scale(.97); }
 
+  /* Switching to or between elements fades the new view in. */
+  .ath-frame.is-wide .ath-view-in { animation: ath-view .4s var(--ath-ease) both; }
+
   /* Opening the indicators and attachments eases in instead of snapping. */
   .ath-frame.is-wide .sec-ind-more:not([hidden]), .ath-frame.is-wide .sec-files-list:not([hidden]) { animation: ath-open .3s var(--ath-ease) both; }
 }
@@ -47,3 +50,4 @@
 @keyframes ath-float { from { translate: 0 0; } to { translate: 0 -7px; } }
 @keyframes ath-rise { from { opacity: 0; translate: 0 26px; scale: .985; } to { opacity: 1; translate: 0 0; scale: 1; } }
 @keyframes ath-open { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0 0; } }
+@keyframes ath-view { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }

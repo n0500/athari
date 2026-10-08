@@ -218,3 +218,30 @@
   .sec-ind-more[hidden] { display: grid; }
   .sec-impact { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Moving between evaluation elements and the collapsible full list (principal's view). */
+.sec-nav {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: 10px; margin-top: 4px;
+}
+.sec-nav-pos { align-self: center; font-size: 14px; font-weight: 800; color: #475569; background: #fff; border: 1px solid #d5dde8; border-radius: 999px; padding: 6px 14px; }
+.ath .sec-nav-btn {
+  display: grid; gap: 4px; text-align: start; min-height: 64px; padding: 10px 14px; border-radius: 14px;
+  border: 1.5px solid #b9cdf1; background: #fff; color: #1d5fd6; font: inherit; cursor: pointer;
+}
+.ath .sec-nav-btn small { font-size: 12.5px; font-weight: 700; color: #475569; }
+.ath .sec-nav-btn strong { font-size: 15px; font-weight: 800; line-height: 1.5; color: #0f213d; }
+.ath .sec-nav-btn.next { text-align: end; }
+.ath .sec-nav-btn:hover { background: #f3f7ff; }
+@media (max-width: 639px) {
+  .sec-nav { grid-template-columns: 1fr 1fr; }
+  .sec-nav-pos { grid-column: 1 / -1; grid-row: 1; justify-self: center; }
+}
+
+.sec-all { display: flex; justify-content: center; margin: 6px 0 10px; }
+.ath .sec-all-toggle {
+  min-height: 48px; padding: 10px 22px; border-radius: 14px; border: 1.5px solid #b9cdf1; background: #fff;
+  color: #1d5fd6; font: inherit; font-size: 15.5px; font-weight: 800; cursor: pointer;
+}
+.ath .sec-all-toggle:hover { background: #f3f7ff; }
+.sec-list[hidden] { display: none; }
+@media print { .sec-list[hidden] { display: grid; } .sec-all, .sec-nav { display: none; } }
