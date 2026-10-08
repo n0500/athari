@@ -607,3 +607,4 @@ button.el-excel-proof:hover { background: #fbe6b0; }
   .ath-frame.is-wide .ath-hero:has(.ath-hero-figs) .ath-hero-sub { display: none; }
   .ath-frame.is-wide .ath-hero-figs .fig { min-width: 120px; }
 }
+@media (min-width: 900px) { .ath-frame.is-wide .ath-hero-btns:has(.ath-btn.white) { max-width: 460px; } }
