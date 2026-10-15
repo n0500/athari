@@ -139,7 +139,9 @@ export function PortfolioPresentation({
   const nextGroup = navIndex >= 0 && navIndex < navGroups.length - 1 ? navGroups[navIndex + 1] : null;
   function goToElement(id: string) {
     setActiveElementId(id);
-    window.scrollTo({ top: 0 });
+    const preview = document.getElementById("portfolio-preview-content");
+    if (preview) preview.scrollTo({ top: 0 });
+    else window.scrollTo({ top: 0 });
   }
 
   function openSpecificAttachment(item: ShareEvidence, attachmentIndex: number) {
@@ -347,7 +349,7 @@ export function PortfolioPresentation({
             </div>
             <ElementGrid
               elements={elementSummaries}
-              tapFor={(id) => ({ onClick: () => { setActiveElementId(id); window.scrollTo({ top: 0 }); } })}
+              tapFor={(id) => ({ onClick: () => goToElement(id) })}
             />
 
             <div id="approved-evidence">

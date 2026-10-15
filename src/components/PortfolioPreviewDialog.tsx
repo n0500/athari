@@ -1,45 +1,58 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { PrincipalPortfolioPreview } from "@/components/PrincipalPortfolioPreview";
 import "./portfolio-preview-dialog.css";
 
-/** Keep the teacher's page mounted, including its scroll position and open sections. */
+/** Keep preview, report controls and printing in one browser document. */
 export function PortfolioPreviewDialog({ onClose }: { onClose: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const backRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const previousOverflow = document.body.style.overflow;
+    if (!mounted) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    document.body.style.overflow = "hidden";
-    dialog.showModal();
+    const background = document.querySelector<HTMLElement>("body > .ath");
+    const wasInert = background?.inert ?? false;
+    if (background) background.inert = true;
+    backRef.current?.focus({ preventScroll: true });
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (document.querySelector(".ev-report-backdrop, .share-viewer-backdrop")) return;
+      event.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", onKey);
     return () => {
-      dialog.close();
-      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKey);
+      if (background) background.inert = wasInert;
       previousFocus?.focus({ preventScroll: true });
     };
-  }, []);
+  }, [mounted, onClose]);
 
-  return (
-    <dialog
-      ref={dialogRef}
-      className="portfolio-preview-dialog"
+  if (!mounted) return null;
+
+  return createPortal(
+    <section
+      className="portfolio-preview-overlay no-print"
+      role="dialog"
+      aria-modal="true"
       aria-labelledby="portfolio-preview-title"
       dir="rtl"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
     >
       <header className="portfolio-preview-toolbar">
         <strong id="portfolio-preview-title">معاينة</strong>
         <div className="portfolio-preview-actions">
-          <a href="/preview?print=1" target="_blank" rel="noreferrer">طباعة الملف</a>
-          <button type="button" onClick={onClose} autoFocus>العودة إلى صفحتي</button>
+          <button ref={backRef} type="button" onClick={onClose}>العودة إلى صفحتي</button>
         </div>
       </header>
-      <iframe src="/preview?embedded=1" title="معاينة ملف الأداء" />
-    </dialog>
+      <div className="portfolio-preview-content" id="portfolio-preview-content">
+        <PrincipalPortfolioPreview />
+      </div>
+    </section>,
+    document.body
   );
 }
