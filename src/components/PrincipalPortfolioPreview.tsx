@@ -110,7 +110,7 @@ export function PrincipalPortfolioPreview() {
           المشاركة غير مفعلة. هذه معاينة خاصة لشواهدك المعتمدة بنفس تصميم عرض المديرة.
         </div>
       ) : null}
-      <PortfolioPresentation share={share} loading={loading} />
+      <PortfolioPresentation share={share} loading={loading} allowDownload />
     </>
   );
 }

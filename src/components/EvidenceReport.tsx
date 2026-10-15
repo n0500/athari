@@ -50,7 +50,7 @@ function thumbnailUrl(fileId: string) {
 
 /**
  * A readable report for one approved evidence, built only from approved content.
- * «طباعة / حفظ PDF» prints the report alone on A4 using the browser print dialog.
+ * «تصدير PDF» exports only this report via the device's print / save-PDF dialog.
  */
 export function EvidenceReport({
   item,
@@ -121,7 +121,8 @@ export function EvidenceReport({
 
   function downloadPdf() {
     const previousTitle = document.title;
-    document.title = `تقرير شاهد - ${item.title}`;
+    // Browsers use the document title as the suggested PDF filename.
+    document.title = item.title;
     document.body.classList.add("print-evidence-report");
     const restore = () => {
       document.body.classList.remove("print-evidence-report");
@@ -160,7 +161,7 @@ export function EvidenceReport({
           ) : <span className="ev-report-label">تقرير الشاهد</span>}
           {allowDownload ? (
             <button type="button" className="ev-report-pdf" onClick={downloadPdf}>
-              <Glyph name="download" size={17} />طباعة / حفظ PDF
+              <Glyph name="download" size={17} />تصدير PDF
             </button>
           ) : <span className="ev-report-spacer" />}
         </header>
@@ -272,9 +273,25 @@ export function EvidenceReport({
                   return (
                     <li key={`${attachment.originalFileName}-${index}`}>
                       <span className="rp-num" aria-hidden>{index + 1}</span>
-                      <span className="rp-name" title={attachment.originalFileName}>
-                        {attachmentTitle(attachment.originalFileName, meta.ownerName, index)}
-                      </span>
+                      {allowDownload && attachment.driveFileId ? (
+                        <a
+                          className="rp-name rp-file-link"
+                          href={`https://drive.google.com/file/d/${encodeURIComponent(attachment.driveFileId)}/view`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={attachment.originalFileName}
+                          onClick={onOpenAttachment ? (event) => {
+                            event.preventDefault();
+                            onOpenAttachment(index);
+                          } : undefined}
+                        >
+                          {attachmentTitle(attachment.originalFileName, meta.ownerName, index)}
+                        </a>
+                      ) : (
+                        <span className="rp-name" title={attachment.originalFileName}>
+                          {attachmentTitle(attachment.originalFileName, meta.ownerName, index)}
+                        </span>
+                      )}
                       <span className={`rp-kind ${kind.tone}`}>{kind.label}</span>
                       {canOpen ? (
                         <button type="button" className="rp-open" onClick={() => onOpenAttachment!(index)} aria-label={`عرض المرفق ${index + 1}`}>

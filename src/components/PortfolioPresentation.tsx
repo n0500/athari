@@ -62,10 +62,12 @@ export function PortfolioPresentation({
   share: sourceShare,
   loading = false,
   error = "",
+  allowDownload = false,
 }: {
   share: PortfolioShare | null;
   loading?: boolean;
   error?: string;
+  allowDownload?: boolean;
 }) {
   const share = useMemo(
     () => sourceShare ? { ...sourceShare, evidence: sourceShare.evidence.map(presentableEvidence) } : null,
@@ -369,6 +371,7 @@ export function PortfolioPresentation({
       {report ? (
         <EvidenceReport
           item={report}
+          allowDownload={allowDownload}
           position={{ index: Math.max(0, reportEvidence.findIndex((entry) => entry.id === report.id)), total: reportEvidence.length }}
           onPrev={(() => {
             const at = reportEvidence.findIndex((entry) => entry.id === report.id);
