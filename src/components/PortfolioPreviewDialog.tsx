@@ -38,7 +38,7 @@ export function PortfolioPreviewDialog({ onClose }: { onClose: () => void }) {
         onClose();
       }}
     >
-      <iframe ref={iframeRef} src="/preview?embedded=1" title="معاينة ملف الأداء" allow="web-share" />
+      <iframe ref={iframeRef} src="/export-check/?inside=1" title="معاينة ملف الأداء" allow="web-share" />
     </dialog>
   );
 }
