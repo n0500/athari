@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PortfolioPreviewDialog } from "@/components/PortfolioPreviewDialog";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import {
@@ -45,6 +46,7 @@ export default function PortfolioPage() {
   const [justAdded, setJustAdded] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [sharePending, setSharePending] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("share") === "1") setShareOpen(true);
@@ -238,6 +240,7 @@ export default function PortfolioPage() {
 
   return (
     <AthShell wide title="ملف الأداء المهني" subtitle="عناصر التقييم والشواهد المرتبطة بها.">
+      {previewOpen ? <PortfolioPreviewDialog onClose={() => setPreviewOpen(false)} /> : null}
       {justAdded ? (
         <section className="ath-success ath-scene-card" role="status">
           <button type="button" className="x" onClick={() => setJustAdded(false)} aria-label="إغلاق"><span aria-hidden>×</span></button>
@@ -258,8 +261,8 @@ export default function PortfolioPage() {
         covered={covered.size}
         total={totalElements}
         loading={loading}
-        browse={{ href: "/preview" }}
-        browseLabel="معاينة / طباعة"
+        browse={{ onClick: () => setPreviewOpen(true) }}
+        browseLabel="معاينة"
         extra={
           <>
             <Link className="ath-btn white" href="/profile"><Glyph name="user" size={18} /> الهوية المهنية</Link>

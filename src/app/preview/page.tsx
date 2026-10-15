@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { PrincipalPortfolioPreview } from "@/components/PrincipalPortfolioPreview";
 import {
   AthShell,
   CountChip,
@@ -37,7 +38,7 @@ function classificationsFor(item: EvidenceRecord): ApprovedClassification[] {
   return [];
 }
 
-export default function PreviewPage() {
+function PrintPreviewPage() {
   const router = useRouter();
   const [items, setItems] = useState<EvidenceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -218,5 +219,30 @@ export default function PreviewPage() {
         })}
       </section>
     </AthShell>
+  );
+}
+
+/** Preserve the existing printable document while previewing the actual principal view. */
+export default function PreviewPage() {
+  const [mode, setMode] = useState<"print" | "embedded" | "page" | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setMode(params.get("print") === "1" ? "print" : params.get("embedded") === "1" ? "embedded" : "page");
+  }, []);
+
+  if (!mode) return null;
+  if (mode === "print") return <PrintPreviewPage />;
+  return (
+    <>
+      {mode === "page" ? (
+        <div className="ath no-print">
+          <div className="ath-actions" style={{ padding: 16 }}>
+            <a className="ath-btn outline fit" href="/portfolio">العودة إلى ملف الأداء</a>
+            <a className="ath-btn outline fit" href="/preview?print=1">طباعة الملف</a>
+          </div>
+        </div>
+      ) : null}
+      <PrincipalPortfolioPreview />
+    </>
   );
 }
