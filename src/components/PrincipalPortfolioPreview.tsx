@@ -30,14 +30,28 @@ export function PrincipalPortfolioPreview() {
 
     let cancelled = false;
     let request = 0;
+    let timeout: ReturnType<typeof setTimeout>;
+    const startTimeout = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        if (cancelled) return;
+        ++request;
+        setError("تعذر تحميل المعاينة. تحققي من الاتصال ثم أعيدي المحاولة.");
+        setLoading(false);
+      }, 15_000);
+    };
+    startTimeout();
     const unsubscribe = onAuthStateChanged(requireAuth(), async (user) => {
       const currentRequest = ++request;
       const isCurrent = () => !cancelled && request === currentRequest;
+      startTimeout();
       setShare(null);
       setPrivatePreview(false);
       setLoading(true);
       setError("");
       if (!user) {
+        clearTimeout(timeout);
+        setLoading(false);
         router.replace("/login");
         return;
       }
@@ -79,11 +93,15 @@ export function PrincipalPortfolioPreview() {
       } catch {
         if (isCurrent()) setError("تعذر تحميل المعاينة. حاولي مرة أخرى.");
       } finally {
-        if (isCurrent()) setLoading(false);
+        if (isCurrent()) {
+          clearTimeout(timeout);
+          setLoading(false);
+        }
       }
     });
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
       unsubscribe();
     };
   }, [router, attempt]);

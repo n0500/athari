@@ -9,6 +9,7 @@ import {
 import { requireDb } from "@/lib/firebase";
 import type { ProfessionalProfile } from "@/types/athari";
 import { normalizeProfessionalProfile } from "@/lib/professionalProfile";
+import { readPublicShareDocument } from "@/lib/publicShareRead";
 
 export type ShareClassification = {
   elementId: string;
@@ -197,9 +198,10 @@ export async function revokePortfolioShare(uid: string, shareId: string) {
 
 export async function getPublicPortfolioShare(token: string) {
   if (!token) return null;
-  const snap = await getDoc(doc(requireDb(), "publicShares", token));
-  if (!snap.exists()) return null;
-  const share = normalizeShare(snap.id, snap.data());
+  const projectId = requireDb().app.options.projectId;
+  if (!projectId) throw new Error("FIREBASE_NOT_CONFIGURED");
+  const data = await readPublicShareDocument(projectId, token);
+  const share = normalizeShare(token, data);
   return share?.active ? share : null;
 }
 

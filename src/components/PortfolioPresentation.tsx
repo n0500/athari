@@ -63,11 +63,13 @@ export function PortfolioPresentation({
   loading = false,
   error = "",
   allowDownload = false,
+  onRetry,
 }: {
   share: PortfolioShare | null;
   loading?: boolean;
   error?: string;
   allowDownload?: boolean;
+  onRetry?: () => void;
 }) {
   const share = useMemo(
     () => sourceShare ? { ...sourceShare, evidence: sourceShare.evidence.map(presentableEvidence) } : null,
@@ -172,8 +174,9 @@ export function PortfolioPresentation({
         <main className="ath-auth">
           <div className="ath-auth-card ath-scene-card">
             <Scene kind="locked" />
-            <strong>الرابط غير متاح</strong>
+            <strong>{onRetry ? "تعذر فتح ملف الأداء" : "الرابط غير متاح"}</strong>
             <p>{error || "قد تكون مشاركة ملف الأداء قد أُوقفت."}</p>
+            {onRetry ? <button type="button" className="ath-btn primary" onClick={onRetry}>إعادة المحاولة</button> : null}
           </div>
         </main>
       </div>
