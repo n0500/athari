@@ -50,7 +50,7 @@ function thumbnailUrl(fileId: string) {
 
 /**
  * A readable report for one approved evidence, built only from approved content.
- * «تصدير PDF» exports only this report via the device's print / save-PDF dialog.
+ * «تصدير PDF» creates a downloadable PDF of this report with attachment links.
  */
 export function EvidenceReport({
   item,
@@ -75,6 +75,10 @@ export function EvidenceReport({
 }) {
   // Rendered at the end of <body> so printing can hide the page and keep the report.
   const [mounted, setMounted] = useState(false);
+  const [preparedPdf, setPreparedPdf] = useState<{ id: string; blob: Blob; name: string } | null>(null);
+  const [preparingPdf, setPreparingPdf] = useState(allowDownload);
+  const [exportError, setExportError] = useState("");
+  const [exportAttempt, setExportAttempt] = useState(0);
   useEffect(() => {
     setMounted(true);
     const previous = document.body.style.overflow;
@@ -119,20 +123,47 @@ export function EvidenceReport({
     .slice(0, 6);
   const printedOn = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(new Date());
 
-  function downloadPdf() {
-    const previousTitle = document.title;
-    // Browsers use the document title as the suggested PDF filename.
-    document.title = item.title;
-    document.body.classList.add("print-evidence-report");
-    const restore = () => {
-      document.body.classList.remove("print-evidence-report");
-      document.title = previousTitle;
-      window.removeEventListener("afterprint", restore);
-    };
-    window.addEventListener("afterprint", restore);
-    window.print();
-    // Some mobile browsers do not fire afterprint.
-    window.setTimeout(restore, 60_000);
+  const metaKey = JSON.stringify(meta);
+  useEffect(() => {
+    let cancelled = false;
+    setPreparedPdf(null);
+    setExportError("");
+    if (!allowDownload) { setPreparingPdf(false); return; }
+    setPreparingPdf(true);
+    // Prepare before the tap so iPhone sharing retains its required user gesture.
+    Promise.all([import("@/lib/evidencePdf"), import("@/lib/auth")])
+      .then(async ([renderer, auth]) => {
+        const images = await renderer.loadReportImages(item, auth.getStoredDriveToken());
+        if (cancelled) return;
+        const blob = await renderer.createEvidencePdf({ item, meta, printedOn, images });
+        if (cancelled) return;
+        const name = item.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").replace(/\.pdf$/i, "") || "شاهد";
+        setPreparedPdf({ id: item.id, blob, name: `${name}.pdf` });
+      })
+      .catch(() => { if (!cancelled) setExportError("تعذر تجهيز الملف. اضغطي تصدير PDF للمحاولة مرة أخرى."); })
+      .finally(() => { if (!cancelled) setPreparingPdf(false); });
+    return () => { cancelled = true; };
+  }, [allowDownload, item, metaKey, printedOn, exportAttempt]);
+
+  async function downloadPdf() {
+    if (!preparedPdf || preparedPdf.id !== item.id) { setExportAttempt((value) => value + 1); return; }
+    const file = new File([preparedPdf.blob], preparedPdf.name, { type: "application/pdf" });
+    try {
+      if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+        await navigator.share({ files: [file], title: item.title });
+        return;
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+    }
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = preparedPdf.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
   if (!mounted) return null;
@@ -160,11 +191,12 @@ export function EvidenceReport({
             </div>
           ) : <span className="ev-report-label">تقرير الشاهد</span>}
           {allowDownload ? (
-            <button type="button" className="ev-report-pdf" onClick={downloadPdf}>
-              <Glyph name="download" size={17} />تصدير PDF
+            <button type="button" className="ev-report-pdf" onClick={downloadPdf} disabled={preparingPdf} aria-busy={preparingPdf}>
+              <Glyph name="download" size={17} />{preparingPdf ? "جاري تجهيز PDF…" : "تصدير PDF"}
             </button>
           ) : <span className="ev-report-spacer" />}
         </header>
+        {exportError ? <p className="no-print" role="alert" style={{ padding: 12, background: "#fff" }}>{exportError}</p> : null}
 
         <div className="rp-paper">
           {/* Official letterhead: shown on screen and in print */}

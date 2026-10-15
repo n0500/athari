@@ -227,13 +227,16 @@ export default function PreviewPage() {
   const [mode, setMode] = useState<"print" | "embedded" | "page" | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("embedded") === "1") document.body.classList.add("ath-preview-embedded");
     setMode(params.get("print") === "1" ? "print" : params.get("embedded") === "1" ? "embedded" : "page");
+    return () => document.body.classList.remove("ath-preview-embedded");
   }, []);
 
   if (!mode) return null;
   if (mode === "print") return <PrintPreviewPage />;
   return (
     <>
+      {mode === "embedded" ? <button type="button" className="ath-preview-close" aria-label="إغلاق المعاينة" onClick={() => window.parent.postMessage({ type: "athari-close-preview" }, window.location.origin)}>×</button> : null}
       {mode === "page" ? (
         <div className="ath no-print">
           <div className="ath-actions" style={{ padding: 16 }}>

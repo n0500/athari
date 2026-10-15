@@ -166,6 +166,9 @@
   background: #fff; color: #0f4e59; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; white-space: nowrap;
 }
 .ev-report-top button:focus-visible { outline: 2px solid #7ff5e1; outline-offset: 2px; }
+.ev-report-pdf:disabled { opacity: .75; cursor: progress; }
+.ath-preview-close { position: fixed; top: 10px; left: 14px; z-index: 30; width: 34px; height: 34px; border: 0; border-radius: 10px; color: #fff; background: #0f4e59; font-size: 22px; cursor: pointer; }
+.ath-preview-embedded:has(.ev-report-backdrop, .share-viewer-backdrop) .ath-preview-close { display: none; }
 
 /* official letterhead */
 .ev-letterhead {
