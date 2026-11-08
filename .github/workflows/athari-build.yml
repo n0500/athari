@@ -1,6 +1,10 @@
 name: Athari • Build Check
 
 on:
+  push:
+    branches:
+      - main
+
   workflow_run:
     workflows:
       - "Athari • Apply Update"
@@ -21,6 +25,7 @@ jobs:
     name: Validate static web app
 
     if: >
+      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
 
