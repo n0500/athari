@@ -31,8 +31,11 @@ import type { ShareDrivePermission } from "@/lib/portfolioShare";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import { MANDATORY_REQUIREMENT_COUNT } from "@/data/mandatory-requirements";
 import { EvidenceRecord, ProfessionalProfile } from "@/types/athari";
+import { useAthariTheme } from "@/components/athari-theme/ThemeRuntime";
+import { OasisHeader, OasisElementCards } from "@/components/athari-v2/OasisPortfolio";
 
 export default function PortfolioPage() {
+  const oasis = useAthariTheme() === "oasis";
   const [items, setItems] = useState<EvidenceRecord[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [professionalProfile, setProfessionalProfile] = useState<ProfessionalProfile | null>(null);
@@ -239,7 +242,7 @@ export default function PortfolioPage() {
   const ownerName = professionalProfile?.fullName || user?.displayName?.trim() || "";
 
   return (
-    <AthShell wide title="ملف الأداء المهني" subtitle="عناصر التقييم والشواهد المرتبطة بها.">
+    <AthShell wide title={oasis ? undefined : "ملف الأداء المهني"} subtitle={oasis ? undefined : "عناصر التقييم والشواهد المرتبطة بها."}>
       {previewOpen ? <PortfolioPreviewDialog onClose={() => setPreviewOpen(false)} /> : null}
       {justAdded ? (
         <section className="ath-success ath-scene-card" role="status">
@@ -254,6 +257,13 @@ export default function PortfolioPage() {
         <Notice tone="error">{SHARE_NEEDS_UPDATE_MESSAGE}</Notice>
       ) : null}
 
+      {oasis ? (
+        <OasisHeader name={ownerName} profile={professionalProfile} covered={covered.size} total={totalElements} loading={loading}>
+          <button type="button" className="ath-btn primary" onClick={() => setPreviewOpen(true)}>معاينة ملف الأداء</button>
+          <Link className="ath-btn outline" href="/profile">الهوية المهنية</Link>
+          <button type="button" className="ath-btn outline" aria-expanded={shareOpen} aria-controls="portfolio-share" onClick={() => setShareOpen((value) => !value)}>مشاركة ملف الأداء</button>
+        </OasisHeader>
+      ) : (
       <PortfolioHero
         year={year}
         name={ownerName}
@@ -278,6 +288,7 @@ export default function PortfolioPage() {
           </>
         }
       />
+      )}
 
       {shareOpen ? (
         <section className="ath-panel" id="portfolio-share">
@@ -330,7 +341,7 @@ export default function PortfolioPage() {
       {error ? <Notice tone="error">{error}</Notice> : null}
 
       <SectionHead icon={<Glyph name="bars" />} title="عناصر التقييم" side={<CountChip total={totalElements} />} />
-      <ElementGrid elements={elementSummaries} tapFor={(id) => ({ href: `/element?id=${encodeURIComponent(id)}` })} />
+      {oasis ? <OasisElementCards evidenceByElement={evidenceByElement} /> : <ElementGrid elements={elementSummaries} tapFor={(id) => ({ href: `/element?id=${encodeURIComponent(id)}` })} />}
 
       <SectionHead
         icon={<Glyph name="doc" className="ath-green-ico" />}

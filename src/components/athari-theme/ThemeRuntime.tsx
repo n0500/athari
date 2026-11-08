@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 /** "current" is the existing look: no theme attribute is set, so nothing changes. */
-export type AthariTheme = "current" | "original" | "signature" | "glass";
+export type AthariTheme = "current" | "original" | "signature" | "glass" | "oasis";
 
-export const ATHARI_DEFAULT_THEME: AthariTheme = "current";
+export const ATHARI_DEFAULT_THEME: AthariTheme = "oasis";
 export const ATHARI_THEME_STORAGE_KEY = "athari-theme";
 export const ATHARI_THEME_EVENT = "athari-theme-change";
 
-const THEMES: AthariTheme[] = ["current", "original", "signature", "glass"];
+const THEMES: AthariTheme[] = ["current", "original", "signature", "glass", "oasis"];
 
 export function isAthariTheme(value: string | null | undefined): value is AthariTheme {
   return THEMES.includes(value as AthariTheme);
@@ -48,4 +48,25 @@ export function ThemeRuntime() {
     };
   }, []);
   return null;
+}
+
+/** Keeps the page layout in sync with the selected theme on this device. */
+export function useAthariTheme(): AthariTheme {
+  const [theme, setTheme] = useState<AthariTheme>(ATHARI_DEFAULT_THEME);
+  useEffect(() => {
+    const sync = () => setTheme(readStoredAthariTheme());
+    const onChange = (event: Event) => {
+      const next = (event as CustomEvent<string>).detail;
+      if (isAthariTheme(next)) setTheme(next);
+      else sync();
+    };
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener(ATHARI_THEME_EVENT, onChange);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(ATHARI_THEME_EVENT, onChange);
+    };
+  }, []);
+  return theme;
 }

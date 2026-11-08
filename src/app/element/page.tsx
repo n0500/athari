@@ -9,6 +9,8 @@ import { Icon } from "@/components/Icon";
 import { EvidenceReport, type ReportEvidence } from "@/components/EvidenceReport";
 import { getProfessionalProfile } from "@/lib/professionalProfile";
 import { ElementExcellence } from "@/components/ElementExcellence";
+import { useAthariTheme } from "@/components/athari-theme/ThemeRuntime";
+import { OasisElementView } from "@/components/athari-v2/OasisPortfolio";
 import { OFFICIAL_TEACHER_FRAMEWORK_V2 } from "@/data/official-teacher-framework";
 import { ELEMENT_GUIDANCE } from "@/data/element-guidance";
 import { requirementsForElement } from "@/data/mandatory-requirements";
@@ -65,6 +67,7 @@ function reportClassifications(item: EvidenceRecord): ReportEvidence["classifica
 }
 
 function ElementPageInner() {
+  const oasis = useAthariTheme() === "oasis";
   const params = useSearchParams();
   const router = useRouter();
   const elementId = params.get("id") ?? "";
@@ -190,13 +193,49 @@ function ElementPageInner() {
 
   return (
     <AthShell
-      title="عنصر التقييم"
-      subtitle="بيانات العنصر والشواهد المرتبطة به."
+      title={oasis ? undefined : "عنصر التقييم"}
+      subtitle={oasis ? undefined : "بيانات العنصر والشواهد المرتبطة به."}
       back={{
         onClick: () =>
           window.history.length > 1 ? router.back() : router.push("/portfolio"),
       }}
     >
+      {oasis ? (
+        <OasisElementView
+          elementId={element.id}
+          name={element.officialName}
+          description={element.description}
+          loading={loading}
+          evidence={items.map((item) => {
+            const attachment = attachmentsFor(item)[0];
+            return {
+              id: item.id,
+              title: item.approvedContent?.title || item.originalFileName,
+              description: item.approvedContent?.description || "",
+              impactLabel: "الأثر الموثق",
+              impact: item.approvedContent?.impact || "",
+              reviewHref: `/evidence/review?id=${encodeURIComponent(item.id)}`,
+              onOpenFile: attachment?.driveWebViewLink ? () => window.open(attachment.driveWebViewLink, "_blank", "noopener") : undefined,
+              fileCount: attachmentsFor(item).length,
+              onReport: () => openReport(item),
+            };
+          })}
+          excellence={loading ? null : (
+            <ElementExcellence
+              ownerHint
+              sources={items.map((item) => ({
+                id: item.id,
+                title: item.approvedContent?.title || item.originalFileName,
+                highlight: item.approvedContent?.highlight,
+              }))}
+              onOpenEvidence={(id) => {
+                const found = items.find((entry) => entry.id === id);
+                if (found) openReport(found);
+              }}
+            />
+          )}
+        />
+      ) : (
       <ElementDetail
         elementId={element.id}
         name={element.officialName}
@@ -226,6 +265,7 @@ function ElementPageInner() {
           { label: "عناصر التقييم", tap: { href: "/portfolio" } },
         ]}
       />
+      )}
 
       {requirements.length ? (
         <Panel

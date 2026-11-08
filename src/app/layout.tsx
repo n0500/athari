@@ -9,6 +9,7 @@ import "./athari-mockup.css";
 import "./athari-v7.css";
 import "./athari-themes.css";
 import "./athari-share-motion.css";
+import "./athari-oasis.css";
 import { ThemeRuntime } from "@/components/athari-theme/ThemeRuntime";
 
 export const metadata: Metadata = {

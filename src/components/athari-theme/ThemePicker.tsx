@@ -14,6 +14,7 @@ import {
 const THEMES: Array<{ id: AthariTheme; name: string; subtitle: string; colors: [string, string, string] }> = [
   { id: "current", name: "الحالي", subtitle: "المظهر المعتاد لأثري", colors: ["#EEF4FB", "#0F4E59", "#1D5FD6"] },
   { id: "original", name: "الأصلي المطوَّر", subtitle: "بطاقات بيضاء مستديرة وظلال ناعمة وذهبي هادئ", colors: ["#EEF3F9", "#0E5A60", "#F2C14E"] },
+  { id: "oasis", name: "واحة", subtitle: "الهوية العاجية والزمردية والذهبية بتفاصيل أثري التجاري", colors: ["#FBF7EF", "#134A3E", "#C9A86A"] },
   { id: "signature", name: "توقيع أثري", subtitle: "الزمردي والعاجي بخطوط ذهبية دقيقة", colors: ["#F7F3EA", "#0F5C4A", "#C9A44C"] },
   { id: "glass", name: "زجاجي", subtitle: "طبقات شفافة بتمويه خفيف وعمق بصري", colors: ["#E3ECFB", "#3D5AFE", "#7FD3F7"] },
 ];
